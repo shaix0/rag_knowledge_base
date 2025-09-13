@@ -5,27 +5,52 @@ import os
 
 def parse_questions_from_text(text, exam_date, source_filename):
     """
-    解析原始文本以提取題目、答案、出處等資訊，並將元數據加入其中。
+    解析原始文本以提取題目、答案、選項、出處等資訊，並將元數據加入其中。
     """
     questions = []
+
+    # 處理不規則換行，將選項前的換行替換為空格，並統一移除題目文本中的換行符
+    # 這裡使用更廣泛的模式來處理換行問題
+    processed_text = re.sub(r'\n(?=\s*\(\w\))', ' ', text)
+    processed_text = processed_text.replace('\n', ' ').replace('\r', '')
     
-    # 正規表達式模式來匹配題目
+    # 重新設計更強健的正規表達式，更容錯地匹配各部分
     pattern = re.compile(
-        r'\((\w)\)\s*(\d+)\.\s*(.*?)\s*(\(\*{1,2}.*?\)| \(時事\)| \(時事.*?\)| \(.*?\s*時事\)| \(時事\))\s*((?:\(.\).*?)+?)(?=\s*\(\w\)\s*\d|\s*\Z)',
+        r'\((?P<answer_letter>\w)\)\s*'                 # 答案字母與空格
+        r'(?P<question_number>\d+)\.\s*'                # 題號與點
+        r'(?P<question_text>.*?)\s*'                    # 題目文本，非貪婪匹配
+        r'(?P<source_info>\(\*{1,2}.*?\)| \(時事\)| \(時事.*?\))?' # 題目標記，這裡更具容錯性
+        r'\s*(?P<options_text>(?:\(.\).*?){4})?'        # 選項文本，非貪婪匹配4個
+        r'(?=\s*\(\w\)\s*\d|\s*\Z)',
         re.S | re.M
     )
     
-    # 處理不規則換行，將選項前的換行替換為空格
-    processed_text = re.sub(r'\n(?=\s*\(\w\))', ' ', text)
-    
     matches = re.finditer(pattern, processed_text)
+
+    # 用於從選項文字中提取選項列表的正規表達式
+    option_pattern = re.compile(r'\([A-D]\)\s*(.*?)(?=\s*\([A-D]\)|\s*\Z)')
 
     for match in matches:
         try:
-            answer = match.group(1).strip()
-            # question_number = match.group(2).strip()
-            question_text_and_options = match.group(3).strip() + " " + match.group(5).strip()
-            source_info_str = match.group(4).strip().lstrip('(').rstrip(')')
+            answer_letter = match.group('answer_letter').strip()
+            question_number = match.group('question_number').strip()
+            question_text = match.group('question_text').strip()
+            source_info_str = match.group('source_info').strip().strip('()') if match.group('source_info') else ""
+            options_text = match.group('options_text').strip() if match.group('options_text') else ""
+
+            # 提取選項列表
+            options_list = [opt.strip() for opt in re.findall(option_pattern, options_text)]
+
+            # 確保選項列表有四個，否則視為解析失敗
+            if len(options_list) != 4:
+                print(f"警告：在 {exam_date} 的第 {question_number} 題選項不完整，可能為解析錯誤。已跳過該題。")
+                continue
+            
+            # 根據答案字母找到完整的答案文字
+            answer_text = "無答案"
+            if len(options_list) >= ord(answer_letter.upper()) - ord('A') + 1:
+                answer_index = ord(answer_letter.upper()) - ord('A')
+                answer_text = options_list[answer_index]
 
             # 根據標記處理出處和頁次
             book_source = "無"
@@ -35,25 +60,26 @@ def parse_questions_from_text(text, exam_date, source_filename):
                 book_source = "常用醫護術語"
                 page_match = re.search(r'\*\*(.*)', source_info_str)
                 if page_match:
-                    page_number = page_match.group(1).strip().replace(')', '').strip()
+                    page_number = page_match.group(1).strip()
             elif '*' in source_info_str:
                 book_source = "醫學資訊管理學"
                 page_match = re.search(r'\*(.*)', source_info_str)
                 if page_match:
-                    page_number = page_match.group(1).strip().replace(')', '').strip()
+                    page_number = page_match.group(1).strip()
             
             if '時事' in source_info_str:
-                if book_source == "醫學資訊管理學":
+                if book_source != "無":
                     book_source += "、時事"
                 else:
                     book_source = "時事"
 
             questions.append({
-                "題目": question_text_and_options,
+                "題目": question_text,
+                "選項": options_list,
                 "考試時間": exam_date,
                 "出自哪一本書": book_source,
                 "頁次": page_number,
-                "答案": answer,
+                "答案": answer_text,
                 "來源檔案": source_filename
             })
         except Exception as e:

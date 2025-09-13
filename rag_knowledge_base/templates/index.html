@@ -2,12 +2,6 @@
 
 {% block content %}
 
-<div class="jumbotron">
-    <h1>Flask</h1>
-    <p class="lead">Flask is a free web framework for building great Web sites and Web applications using HTML, CSS and JavaScript.</p>
-    <p><a href="http://flask.pocoo.org/" class="btn btn-primary btn-large">Learn more &raquo;</a></p>
-</div>
-
 <div class="container-fluid">
     <div class="row">
         <!-- 側邊欄 -->
@@ -50,44 +44,19 @@
                     <h4>搜尋結果</h4>
                     <div id="search-results">
                         {% if results %}
-                        <ul class="list-group">
-                            {% for item in results %}
-                            <li class="list-group-item">{{ item }}</li>
-                            {% endfor %}
-                        </ul>
-                        {% else %}
-                        <p>尚未有搜尋結果。</p>
+                        {% for result in results %}
+                        <div class="search-result">
+                            <p><strong>題目：</strong> {{ result.question_text }}</p>
+                            <ul class="list-unstyled">
+                                {% set labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] %}
+                                {% for option in result.options %}
+                                <li>({{ labels[loop.index0] }}) {{ option }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endfor %}
                         {% endif %}
                     </div>
-                </div>
-            </div>
-
-            <!-- 原有內容 -->
-            <div class="jumbotron mt-4">
-                <h1>Flask</h1>
-                <p class="lead">Flask is a free web framework for building great Web sites and Web applications using HTML, CSS and JavaScript.</p>
-                <p><a href="http://flask.pocoo.org/" class="btn btn-primary btn-large">Learn more &raquo;</a></p>
-            </div>
-
-            <div class="row">
-                <div class="col-md-4">
-                    <h2>Getting started</h2>
-                    <p>
-                        Flask gives you a powerful, patterns-based way to build dynamic websites that
-                        enables a clean separation of concerns and gives you full control over markup
-                        for enjoyable, agile development.
-                    </p>
-                    <p><a class="btn btn-default" href="http://flask.pocoo.org/docs/">Learn more &raquo;</a></p>
-                </div>
-                <div class="col-md-4">
-                    <h2>Get more libraries</h2>
-                    <p>The Python Package Index is a repository of software for the Python programming language.</p>
-                    <p><a class="btn btn-default" href="https://pypi.python.org/pypi">Learn more &raquo;</a></p>
-                </div>
-                <div class="col-md-4">
-                    <h2>Microsoft Azure</h2>
-                    <p>You can easily publish to Microsoft Azure using Visual Studio. Find out how you can host your application using a free trial today.</p>
-                    <p><a class="btn btn-default" href="http://azure.microsoft.com">Learn more &raquo;</a></p>
                 </div>
             </div>
         </main>
@@ -95,4 +64,3 @@
 </div>
 
 {% endblock %}
-

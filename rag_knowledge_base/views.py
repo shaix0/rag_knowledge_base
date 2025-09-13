@@ -7,6 +7,7 @@ from flask import render_template, request
 from rag_knowledge_base import app
 import json
 import os
+import re
 
 json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', "all_questions.json")
 try:
@@ -28,29 +29,28 @@ def home():
         'index.html',
         title='Home Page',
         year=datetime.now().year,
-        results=None  # 初始頁面不顯示搜尋結果
+        results=None
     )
 
 @app.route('/search')
 def search():
     """處理搜尋請求的路由。"""
-    # 從 URL 參數中獲取搜尋關鍵字 'q'
     query = request.args.get('q', '').lower()
 
-    # 進行搜尋
     if query:
-        # 篩選知識庫中與關鍵字相關的條目
-        # 這裡的邏輯是，只要關鍵字在任一條目的「題目」或「關鍵字」列表中，就算匹配
-        search_results = [
-            item["題目"]
-            for item in KNOWLEDGE_BASE
-            if query in item["題目"].lower() #or any(query in kw.lower() for kw in item["關鍵字"])
-        ]
+        search_results = []
+        for item in KNOWLEDGE_BASE:
+            # 直接使用 JSON 檔案中已經整理好的「題目」和「選項」
+            # 這裡只篩選出題目包含關鍵字的項目
+            if "題目" in item and query in item["題目"].lower():
+                # 將題目和選項添加到結果列表
+                search_results.append({
+                    "question_text": item.get("題目", ""),
+                    "options": item.get("選項", [])
+                })
     else:
-        # 如果沒有輸入關鍵字，返回空列表
         search_results = []
 
-    # 將搜尋結果傳遞給模板
     return render_template(
         'index.html',
         title='搜尋結果',

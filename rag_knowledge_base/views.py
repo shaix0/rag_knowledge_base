@@ -40,13 +40,15 @@ def search():
     if query:
         search_results = []
         for item in KNOWLEDGE_BASE:
-            # 直接使用 JSON 檔案中已經整理好的「題目」和「選項」
-            # 這裡只篩選出題目包含關鍵字的項目
-            if "題目" in item and query in item["題目"].lower():
-                # 將題目和選項添加到結果列表
+            # 題目或答案包含關鍵字就加入結果
+            if (
+                ("題目" in item and query in item["題目"].lower()) or
+                ("答案" in item and query in item["答案"].lower())
+            ):
                 search_results.append({
                     "question_text": item.get("題目", ""),
-                    "options": item.get("選項", [])
+                    "options": item.get("選項", []),
+                    "exam_date": item.get("考試時間", "")
                 })
     else:
         search_results = []

@@ -28,7 +28,10 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="pdftojson.py" />
+    <Compile Include="rag_knowledge_base\pdftojson.py" />
+    <Compile Include="rag_tag_helper.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="runserver.py" />
     <Compile Include="rag_knowledge_base\__init__.py" />
     <Compile Include="rag_knowledge_base\views.py" />

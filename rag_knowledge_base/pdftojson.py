@@ -8,48 +8,30 @@ def parse_questions_from_text(text, exam_date, source_filename):
     解析原始文本以提取題目、答案、選項、出處等資訊，並將元數據加入其中。
     """
     questions = []
-
-    # 1. 文本前處理：移除多餘的換行、空格、頁碼、頁首/頁尾
-    # 移除 "第X頁,共Y頁" 這樣的頁碼
-    processed_text = re.sub(r'第\d+頁,共\d+頁', '', text)
-    # 移除像 "CHIO"、"PART I" 或 "Solution" 的標題，以及單獨的數字頁碼
-    processed_text = re.sub(r'(?i)(?:CHIO|PART\s+I|Solution|Given\s+two.*|Example\s+\d+|Input|Output|Note:)\s*\n?', '', processed_text)
-    processed_text = re.sub(r'\n\s*\d+\s*\n', '\n', processed_text)
-    # 移除一些常見的標題/註解
-    processed_text = re.sub(r'社團法人台灣醫學資訊學會|醫學資訊管理師檢定考試試題|選擇題\d+題.*?請選擇一個最正確的答案。|\*表示.*?之頁次|\*\*表示.*?之頁次|獨立作業區', '', processed_text)
     
-    # 將選項前的換行替換為空格
-    processed_text = re.sub(r'\n(?=\s*\(\w\))', ' ', processed_text)
-    # 移除多餘空格和換行
-    processed_text = re.sub(r'\s+', '', processed_text)
-
-    # 將處理後的文字存成 txt 檔案
-    output_folder = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')  # 指定輸出資料夾
-    os.makedirs(output_folder, exist_ok=True)
-    output_file_path = os.path.join(output_folder, f"{source_filename}_processed.txt")
-    with open(output_file_path, 'w', encoding='utf-8') as f:
-        f.write(processed_text)
-    print(f"處理後的文字已儲存至 {output_file_path}")
-
+    # 移除空格和換行
+    processed_text = re.sub(r'\s+', '', text)
+    print(processed_text)
     # 重新設計更強健的正規表達式，更容錯地匹配各部分
     pattern = re.compile(
-        r'\((?P<answer_letters>[\w\sor]+?)\)\s*'      # 答案字母，支援 "A or C" 等格式
+        r'(?P<answer_letters>(?:\([A-D]\)(?:\s*or\s*\([A-D]\))*))\s*' # 提取答案字母，支援 "(A)or(C)" 等格式
         r'(?P<question_number>\d+)\.\s*'              # 題號與點
         r'(?P<question_text>.*?)\s*'                  # 題目文本，非貪婪匹配
-        r'(?P<source_info>\(\*{1,2}.*?\)| \(時事\)| \(時事.*?\))?' # 題目標記，這裡更具容錯性
-        r'\s*(?P<options_text>(?:\(.\).*?){4})?'      # 選項文本，非貪婪匹配4個
+        r'(?P<source_info>\(\*{1,2}.*?\)| \(時事\)| \(時事.*?\))?' # 來源，這裡更具容錯性
+        r'\s*(?P<options_text>(?:\(.\).*?){4})?'      # 選項文本，匹配4個
         r'(?=\s*\(\w\)\s*\d|\s*\Z)',
-        re.S | re.M
+        #re.S | re.M
     )
     
     matches = re.finditer(pattern, processed_text)
 
-    # 用於從選項文字中提取選項列表的正規表達式
-    option_pattern = re.compile(r'\([A-D]\)\s*(.*?)(?=\s*\([A-D]\)|\s*\Z)')
+    # 分割選項
+    option_pattern = re.compile(r'\([A-D]\)(.*?)(?=\([A-D]\)|$)')
 
     for match in matches:
         try:
             answer_letters_str = match.group('answer_letters').strip()
+            answer_letters = re.findall(r'\(([A-D])\)', answer_letters_str)  # 直接取得所有字母
             question_number = match.group('question_number').strip()
             question_text = match.group('question_text').strip()
             source_info_str = match.group('source_info').strip().strip('()') if match.group('source_info') else ""
@@ -66,7 +48,6 @@ def parse_questions_from_text(text, exam_date, source_filename):
             # 根據答案字母字串找到完整的答案文字
             # 處理多個答案，例如 "A or C"
             answer_text = "無答案"
-            answer_letters = re.split(r'\s*or\s*', answer_letters_str)
             correct_answers_text = []
 
             for letter in answer_letters:
@@ -101,10 +82,10 @@ def parse_questions_from_text(text, exam_date, source_filename):
             questions.append({
                 "題目": question_text,
                 "選項": options_list,
+                "答案": answer_text,
                 "來源書籍": book_source,
                 "頁次": page_number,
-                "答案": answer_text,
-                "考試時間": exam_date,
+                #"考試時間": exam_date,
                 "來源檔案": source_filename
             })
         except Exception as e:
@@ -112,6 +93,56 @@ def parse_questions_from_text(text, exam_date, source_filename):
             continue
 
     return questions
+
+def merge_questions(json_path):
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    merged = {}
+    for q in data:
+        key = (q["題目"], q["答案"])  # 判斷相同題目
+        if key not in merged:
+            merged[key] = {
+                "題目": q["題目"],
+                "選項": q["選項"],
+                "答案": q["答案"],
+                "來源書籍": q.get("來源書籍", ""),
+                "頁次": q.get("頁次", ""),
+                "來源檔案": set([q.get("來源檔案")]) if q.get("來源檔案") else set(),
+                #"考試時間": set([q.get("考試時間")]) if q.get("考試時間") else set(),
+                #"tags": set(q.get("tags", []))
+            }
+        else:
+            # 合併來源檔案
+            if q.get("來源檔案"):
+                if isinstance(q["來源檔案"], list):
+                    merged[key]["來源檔案"].update(q["來源檔案"])
+                else:
+                    merged[key]["來源檔案"].add(q["來源檔案"])
+
+            # 合併考試時間
+            #if q.get("來源檔案"):
+             #   if isinstance(q["來源檔案"], list):
+             #       merged[key]["考試時間"].update(q["考試時間"])
+            #    else:
+            #        merged[key]["來源檔案"].add(q["來源檔案"])
+            
+
+            # 合併標籤
+            #merged[key]["tags"].update(q.get("tags", []))
+
+    # set 轉回 list 才能存 JSON
+    merged_list = []
+    for v in merged.values():
+        v["來源檔案"] = list(v["來源檔案"])
+        #v["考試時間"] = list(v["考試時間"])
+        #v["tags"] = list(v["tags"])
+        merged_list.append(v)
+
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(merged_list, f, ensure_ascii=False, indent=4)
+
+    print(f"合併完成，共 {len(merged_list)} 題，已輸出至 {json_path}")
 
 # 獲取資料夾中所有以 .pdf 結尾的檔案
 pdf_folder_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')
@@ -135,6 +166,7 @@ for pdf_path in pdf_files:
         with fitz.open(pdf_path) as doc:
             for page in doc:
                 text += page.get_text()
+        #print(text)
         print(f"成功從 {filename} 提取文本。")
 
         # 使用解析函式處理文本
@@ -147,15 +179,16 @@ for pdf_path in pdf_files:
 
 # 將所有整理好的題目儲存為 JSON 檔案
 output_folder = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')  # 指定輸出資料夾
-output_filename = os.path.join(output_folder, "all_questions.json")  # 將檔案儲存到指定資料夾
-
 # 確保輸出資料夾存在
-#os.makedirs(output_folder, exist_ok=True)
+os.makedirs(output_folder, exist_ok=True)
+output_filename = os.path.join(output_folder, "all_questions.json")  # 將檔案儲存到指定資料夾
 
 with open(output_filename, 'w', encoding='utf-8') as f:
     json.dump(all_extracted_questions, f, ensure_ascii=False, indent=4)
 
 print(f"\n所有 {len(all_extracted_questions)} 個題目已成功整理並儲存至 {output_filename}")
+
+merge_questions(output_filename)
 
 '''
 # --- LangChain 與 ChromaDB 整合部分 ---
@@ -211,3 +244,4 @@ def clear_database():
     else:
         print("資料庫不存在，無需清除。")
 '''
+

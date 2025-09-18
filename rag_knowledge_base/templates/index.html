@@ -48,7 +48,7 @@
                         <div class="search-result">
                             <p><strong>題目：</strong> {{ result.question_text }} {{ result.exam_date }}</p>
                             <ul class="list-unstyled">
-                                {% set labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] %}
+                                {% set labels = ['A', 'B', 'C', 'D'] %}
                                 {% for option in result.options %}
                                 <li>({{ labels[loop.index0] }}) {{ option }}</li>
                                 {% endfor %}

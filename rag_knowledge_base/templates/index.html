@@ -46,7 +46,7 @@
                         {% if results %}
                         {% for result in results %}
                         <div class="search-result">
-                            <p><strong>題目：</strong> {{ result.question_text }} {{ result.exam_date }}</p>
+                            <p><strong>題目：</strong> {{ result.question_text }}</p>
                             <ul class="list-unstyled">
                                 {% set labels = ['A', 'B', 'C', 'D'] %}
                                 {% for option in result.options %}

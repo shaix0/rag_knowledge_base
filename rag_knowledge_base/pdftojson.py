@@ -98,9 +98,10 @@ def merge_questions(json_path):
     with open(json_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    merged = {}
+    merged = {} # dict
+
     for q in data:
-        key = (q["題目"], q["答案"])  # 判斷相同題目
+        key = (q["題目"], q["答案"]) # 以題目和答案作為key，這裡的資料類型是tuple，是不可變的
         if key not in merged:
             merged[key] = {
                 "題目": q["題目"],
@@ -109,36 +110,22 @@ def merge_questions(json_path):
                 "來源書籍": q.get("來源書籍", ""),
                 "頁次": q.get("頁次", ""),
                 "來源檔案": set([q.get("來源檔案")]) if q.get("來源檔案") else set(),
-                #"考試時間": set([q.get("考試時間")]) if q.get("考試時間") else set(),
-                #"tags": set(q.get("tags", []))
             }
         else:
-            # 合併來源檔案
+            # 出現重複題目，合併題目只保留來源檔案。
             if q.get("來源檔案"):
-                if isinstance(q["來源檔案"], list):
+                if isinstance(q["來源檔案"], list): 
                     merged[key]["來源檔案"].update(q["來源檔案"])
                 else:
                     merged[key]["來源檔案"].add(q["來源檔案"])
 
-            # 合併考試時間
-            #if q.get("來源檔案"):
-             #   if isinstance(q["來源檔案"], list):
-             #       merged[key]["考試時間"].update(q["考試時間"])
-            #    else:
-            #        merged[key]["來源檔案"].add(q["來源檔案"])
-            
-
-            # 合併標籤
-            #merged[key]["tags"].update(q.get("tags", []))
-
-    # set 轉回 list 才能存 JSON
+    # 把set轉回list
     merged_list = []
     for v in merged.values():
         v["來源檔案"] = list(v["來源檔案"])
-        #v["考試時間"] = list(v["考試時間"])
-        #v["tags"] = list(v["tags"])
         merged_list.append(v)
 
+    # 重新寫入json
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(merged_list, f, ensure_ascii=False, indent=4)
 

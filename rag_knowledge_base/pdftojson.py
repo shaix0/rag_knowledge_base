@@ -2,101 +2,54 @@
 import json
 import re
 import os
-import requests
-import time
-
-# Define the base path for both scripts to ensure consistency
-base_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')
-pdf_folder_path = base_path
-output_folder = base_path
-output_filename = os.path.join(output_folder, "all_questions.json")
-
-# Ollama API URL
-OLLAMA_URL = "http://localhost:11434"
-# Use nomic-embed-text for embeddings
-EMBEDDING_MODEL = "nomic-embed-text"
-
-def get_embedding(text):
-    """
-    使用 Ollama 模型將文字轉換為向量（embeddings）。
-    """
-    payload = {
-        "model": EMBEDDING_MODEL,
-        "prompt": text
-    }
-    
-    # 指數退避重試機制
-    retries = 5
-    for i in range(retries):
-        try:
-            response = requests.post(f"{OLLAMA_URL}/api/embeddings", json=payload, timeout=60)
-            response.raise_for_status()
-            return response.json().get('embedding')
-        except requests.exceptions.RequestException as e:
-            print(f"嘗試 {i+1}/{retries} 次：呼叫 Ollama 產生向量時發生錯誤: {e}")
-            time.sleep(2 ** i)  # 等待 2^i 秒後重試
-    print("重試失敗，無法產生向量。")
-    return None
 
 def parse_questions_from_text(text, exam_date, source_filename):
     """
-    Parses raw text to extract questions, answers, options, and source information,
-    including metadata.
+    解析原始文本以提取題目、答案、選項、出處等資訊，並將元數據加入其中。
     """
     questions = []
     
-    # 1. Text preprocessing: remove extra newlines, spaces, page numbers, headers/footers
-    # Remove "Page X of Y" style page numbers
-    processed_text = re.sub(r'第\d+頁,共\d+頁', '', text)
-    # Remove titles like "CHIO", "PART I", or "Solution", and standalone numeric page numbers
-    processed_text = re.sub(r'(?i)(?:CHIO|PART\s+I|Solution|Given\s+two.*|Example\s+\d+|Input|Output|Note:)\s*\n?', '', processed_text)
-    processed_text = re.sub(r'\n\s*\d+\s*\n', '\n', processed_text)
-    # Remove some common titles/notes
-    processed_text = re.sub(r'社團法人台灣醫學資訊學會|醫學資訊管理師檢定考試試題|選擇題\d+題.*?請選擇一個最正確的答案。|\*表示.*?之頁次|\*\*表示.*?之頁次|獨立作業區', '', processed_text)
-    
-    # Replace newlines before options with a space
-    processed_text = re.sub(r'\n(?=\s*\(\w\))', ' ', processed_text)
-    # Remove extra spaces and newlines
-    processed_text = re.sub(r'\s+', '', processed_text)
-    
-    # Redesigned robust regex to match all parts tolerantly
+    # 移除空格和換行
+    processed_text = re.sub(r'\s+', '', text)
+    print(processed_text)
+    # 重新設計更強健的正規表達式，更容錯地匹配各部分
     pattern = re.compile(
-        r'\((?P<answer_letters>[\w\sor]+?)\)\s*'      # Answer letters, supports "A or C" format
-        r'(?P<question_number>\d+)\.\s*'              # Question number and dot
-        r'(?P<question_text>.*?)\s*'                  # Question text, non-greedy match
-        r'(?P<source_info>\(\*{1,2}.*?\)| \(時事\)| \(時事.*?\))?' # Source tag, more tolerant here
-        r'\s*(?P<options_text>(?:\(.\).*?){4})?'      # Options text, non-greedy match for 4 items
+        r'(?P<answer_letters>(?:\([A-D]\)(?:\s*or\s*\([A-D]\))*))\s*' # 提取答案字母，支援 "(A)or(C)" 等格式
+        r'(?P<question_number>\d+)\.\s*'              # 題號與點
+        r'(?P<question_text>.*?)\s*'                  # 題目文本，非貪婪匹配
+        r'(?P<source_info>\(\*{1,2}.*?\)| \(時事\)| \(時事.*?\))?' # 來源，這裡更具容錯性
+        r'\s*(?P<options_text>(?:\(.\).*?){4})?'      # 選項文本，匹配4個
         r'(?=\s*\(\w\)\s*\d|\s*\Z)',
-        re.S | re.M
+        #re.S | re.M
     )
     
     matches = re.finditer(pattern, processed_text)
-    
-    # Regex to extract options from the options text
-    option_pattern = re.compile(r'\([A-D]\)\s*(.*?)(?=\s*\([A-D]\)|\s*\Z)')
-    
+
+    # 分割選項
+    option_pattern = re.compile(r'\([A-D]\)(.*?)(?=\([A-D]\)|$)')
+
     for match in matches:
         try:
             answer_letters_str = match.group('answer_letters').strip()
+            answer_letters = re.findall(r'\(([A-D])\)', answer_letters_str)  # 直接取得所有字母
             question_number = match.group('question_number').strip()
             question_text = match.group('question_text').strip()
             source_info_str = match.group('source_info').strip().strip('()') if match.group('source_info') else ""
             options_text = match.group('options_text').strip() if match.group('options_text') else ""
-            
-            # Extract list of options
+
+            # 提取選項列表
             options_list = [opt.strip() for opt in re.findall(option_pattern, options_text)]
-            
-            # Ensure there are four options, otherwise assume parsing failed and skip
+
+            # 確保選項列表有四個，否則視為解析失敗
             if len(options_list) != 4:
                 print(f"警告：在 {exam_date} 的第 {question_number} 題選項不完整，可能為解析錯誤。已跳過該題。")
                 continue
             
-            # Find the full answer text based on the answer letters string
-            # Handle multiple answers, e.g., "A or C"
+            # 根據答案字母字串找到完整的答案文字
+            # 處理多個答案，例如 "A or C"
             answer_text = "無答案"
-            answer_letters = re.split(r'\s*or\s*', answer_letters_str)
             correct_answers_text = []
-            
+
             for letter in answer_letters:
                 if len(options_list) >= ord(letter.upper()) - ord('A') + 1:
                     answer_index = ord(letter.upper()) - ord('A')
@@ -104,11 +57,11 @@ def parse_questions_from_text(text, exam_date, source_filename):
             
             if correct_answers_text:
                 answer_text = " 或 ".join(correct_answers_text)
-            
-            # Process source and page number based on the tags
+
+            # 根據標記處理出處和頁次
             book_source = "無"
             page_number = "無"
-            
+
             if '**' in source_info_str:
                 book_source = "常用醫護術語"
                 page_match = re.search(r'\*\*(.*)', source_info_str)
@@ -125,23 +78,62 @@ def parse_questions_from_text(text, exam_date, source_filename):
                     book_source += "、時事"
                 else:
                     book_source = "時事"
-            
+
             questions.append({
                 "題目": question_text,
                 "選項": options_list,
+                "答案": answer_text,
                 "來源書籍": book_source,
                 "頁次": page_number,
-                "答案": answer_text,
-                "考試時間": exam_date,
+                #"考試時間": exam_date,
                 "來源檔案": source_filename
             })
         except Exception as e:
             print(f"解析題目時發生錯誤: {e}. 原始匹配文字: {match.group(0)}")
             continue
-    
+
     return questions
 
-# Get all PDF files in the specified folder
+def merge_questions(json_path):
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    merged = {} # dict
+
+    for q in data:
+        key = (q["題目"], q["答案"]) # 以題目和答案作為key，這裡的資料類型是tuple，是不可變的
+        if key not in merged:
+            merged[key] = {
+                "題目": q["題目"],
+                "選項": q["選項"],
+                "答案": q["答案"],
+                "來源書籍": q.get("來源書籍", ""),
+                "頁次": q.get("頁次", ""),
+                "來源檔案": set([q.get("來源檔案")]) if q.get("來源檔案") else set(),
+            }
+        else:
+            # 出現重複題目，合併題目只保留來源檔案。
+            if q.get("來源檔案"):
+                if isinstance(q["來源檔案"], list): 
+                    merged[key]["來源檔案"].update(q["來源檔案"])
+                else:
+                    merged[key]["來源檔案"].add(q["來源檔案"])
+
+    # 把set轉回list
+    merged_list = []
+    for v in merged.values():
+        v["來源檔案"] = list(v["來源檔案"])
+        merged_list.append(v)
+
+    # 重新寫入json
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(merged_list, f, ensure_ascii=False, indent=4)
+
+    print(f"合併完成，共 {len(merged_list)} 題，已輸出至 {json_path}")
+
+# 獲取資料夾中所有以 .pdf 結尾的檔案
+pdf_folder_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')
+
 try:
     pdf_files = [os.path.join(pdf_folder_path, f) for f in os.listdir(pdf_folder_path) if f.endswith('.pdf')]
 except FileNotFoundError:
@@ -150,46 +142,92 @@ except FileNotFoundError:
 
 all_extracted_questions = []
 
-# Iterate through each PDF file
+# 遍歷每個 PDF 檔案
 for pdf_path in pdf_files:
     filename = os.path.basename(pdf_path)
-    # Extract exam date from the filename
+    # 從檔名提取考試時間
     exam_date = os.path.splitext(filename)[0]
-    
+
     text = ""
     try:
         with fitz.open(pdf_path) as doc:
             for page in doc:
                 text += page.get_text()
+        #print(text)
         print(f"成功從 {filename} 提取文本。")
-        
-        # Process the text using the parsing function
+
+        # 使用解析函式處理文本
         questions_from_file = parse_questions_from_text(text, exam_date, filename)
         all_extracted_questions.extend(questions_from_file)
-    
+
     except Exception as e:
         print(f"從 {filename} 提取文本或解析時發生錯誤: {e}")
         continue
 
-print(f"\n已從所有 PDF 檔案中解析出 {len(all_extracted_questions)} 個題目。")
-
-# --- 產生向量嵌入並加入題目資料中 ---
-
-print("\n正在為每個題目產生向量嵌入...")
-for item in all_extracted_questions:
-    # 組合題目與答案作為嵌入的輸入文本
-    combined_text = f"題目: {item['題目']}\n答案: {item['答案']}"
-    embedding = get_embedding(combined_text)
-    if embedding:
-        item['embedding'] = embedding
-    else:
-        print(f"警告: 無法為題目 '{item['題目'][:20]}...' 產生向量。")
-
-# Save all processed questions to a single JSON file
+# 將所有整理好的題目儲存為 JSON 檔案
+output_folder = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')  # 指定輸出資料夾
+# 確保輸出資料夾存在
 os.makedirs(output_folder, exist_ok=True)
+output_filename = os.path.join(output_folder, "all_questions.json")  # 將檔案儲存到指定資料夾
 
 with open(output_filename, 'w', encoding='utf-8') as f:
     json.dump(all_extracted_questions, f, ensure_ascii=False, indent=4)
 
-print(f"\n所有 {len(all_extracted_questions)} 個題目（包含向量）已成功整理並儲存至 {output_filename}")
-print("現在您可以執行 langchain_from_json.py 來建立 ChromaDB 向量資料庫了。")
+print(f"\n所有 {len(all_extracted_questions)} 個題目已成功整理並儲存至 {output_filename}")
+
+merge_questions(output_filename)
+
+'''
+# --- LangChain 與 ChromaDB 整合部分 ---
+from langchain_ollama import OllamaLLM, OllamaEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_core.documents import Document
+
+# 初始化 Ollama 模型
+llm = OllamaLLM(model="mistral")
+embeddings = OllamaEmbeddings(model="nomic-embed-text")
+
+# 2. 將 JSON 資料轉換為 LangChain Document 格式
+documents = []
+for item in all_extracted_questions:
+    # 組合題目與選項，作為主要內容
+    page_content = f"題目: {item['題目']}\n選項: {', '.join(item['選項'])}\n答案: {item['答案']}"
+    
+    # 將其他資訊作為元資料 (metadata)
+    metadata = {
+        "考試時間": item.get('考試時間', ''),
+        "出自哪一本書": item.get('出自哪一本書', ''),
+        "頁次": item.get('頁次', ''),
+        "來源檔案": item.get('來源檔案', ''),
+        # 這裡不處理 tags，因為這個腳本主要是解析和建立
+    }
+    
+    # 建立 Document 物件並加入列表
+    documents.append(Document(page_content=page_content, metadata=metadata))
+
+if not documents:
+    print("沒有可用的文件來建立向量資料庫。")
+else:
+    # 3. 建立向量資料庫 medical_questions
+    vector_db = Chroma.from_documents(
+        documents=documents,
+        embedding=embeddings,
+        persist_directory="db",
+        collection_name="medical_questions",
+    )
+    print("成功從 JSON 文件建立向量資料庫。")
+'''
+
+'''
+def clear_database():
+    """
+    Clears the entire vector database by removing the 'db' directory.
+    This action is irreversible and should be used with caution.
+    """
+    if os.path.exists(db_directory):
+        print(f"正在清除資料庫： {db_directory}")
+        shutil.rmtree(db_directory)
+        print("資料庫已清除。")
+    else:
+        print("資料庫不存在，無需清除。")
+'''

@@ -76,7 +76,7 @@
     <Content Include="rag_knowledge_base\static\scripts\respond.min.js" />
     <Content Include="rag_knowledge_base\static\scripts\_references.js" />
     <Content Include="rag_knowledge_base\templates\about.html" />
-    <Content Include="rag_knowledge_base\templates\contact.html" />
+    <Content Include="rag_knowledge_base\templates\edit.html" />
     <Content Include="rag_knowledge_base\templates\index.html" />
     <Content Include="rag_knowledge_base\templates\layout.html" />
   </ItemGroup>

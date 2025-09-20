@@ -27,7 +27,7 @@ def home():
     """Renders the home page."""
     return render_template(
         'index.html',
-        title='Home Page',
+        title='首頁',
         year=datetime.now().year,
         results=None
     )
@@ -39,6 +39,7 @@ def search():
 
     if query:
         search_results = []
+        result_word = "查詢結果"
         for item in KNOWLEDGE_BASE:
             # 題目或答案包含關鍵字就加入結果
             if (
@@ -48,8 +49,13 @@ def search():
                 search_results.append({
                     "question_text": item.get("題目", ""),
                     "options": item.get("選項", []),
-                    "exam_date": item.get("考試時間", "")
+                    "book_source": item.get("來源書籍", ""),
+                    "page_number": item.get("頁次", ""),
+                    "source_filename": item.get("來源檔案", ""),
+                    "answer": item.get("答案", "")
                 })
+        if search_results == []:
+            result_word = "查無結果"
     else:
         search_results = []
 
@@ -58,15 +64,16 @@ def search():
         title='搜尋結果',
         year=datetime.now().year,
         results=search_results,
-        search_query=query
+        search_query=query,
+        result_word=result_word,
+        source_path=os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')
     )
 
-@app.route('/contact')
-def contact():
-    """Renders the contact page."""
+@app.route('/edit')
+def edit():
     return render_template(
-        'contact.html',
-        title='Contact',
+        'edit.html',
+        title='管理題庫',
         year=datetime.now().year,
         message='Your contact page.'
     )

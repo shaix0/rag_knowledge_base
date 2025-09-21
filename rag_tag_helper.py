@@ -1,4 +1,4 @@
-﻿import getpass
+﻿'''import getpass
 import os
 import json
 import time
@@ -67,3 +67,24 @@ with open(output_file_path, 'w', encoding='utf-8') as f:
     json.dump(questions, f, ensure_ascii=False, indent=4)
 
 print(f"\n所有標籤處理完成，已成功儲存至 {output_file_path}")
+'''
+
+
+import itertools
+import json
+
+file_path = 'all_questions_with_keywords.json'
+with open(file_path, 'r', encoding='utf-8') as f:
+    questions = json.load(f)
+
+
+sentence_embeddings = [item['標籤'] for item in questions]
+
+sentence_embeddings_pairs = list(itertools.combinations(sentence_embeddings, 2))
+
+def get_text_embedding(inputs):
+    embeddings_batch_response = client.embeddings.create(
+        model=model,
+        inputs=inputs
+    )
+    return embeddings_batch_response.data[0].embedding

@@ -11,10 +11,29 @@
                 <div class="col-md-8">
                     <form method="GET" action="/search">
                         <div class="input-group">
+                            <input type="hidden" name="searchtype" value="q">
                             <input type="text" class="form-control" name="q" placeholder="請輸入關鍵字搜尋..." aria-label="搜尋" style="margin-inline-end: 5px; border-radius: var(--bs-border-radius);">
                             <div class="input-group-append">
                                 <button class="btn btn-primary" type="submit">搜尋</button>
                             </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="row mt-4 mb-3">
+                <div class="col-md-8">
+                    <form method="GET" action="/search">
+                        <div class="input-group">
+                            <input type="hidden" name="searchtype" value="tag">
+                            <select class="form-select" name="tag" aria-label="搜尋">
+                                <option selected disabled>請選擇標籤搜尋...</option>
+                                {% for tag in all_tags %}
+                                <option value={{ tag }}>{{ tag }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="input-group-append">
+                            <button type="submit" class="btn btn-primary">標籤搜尋</button>
                         </div>
                     </form>
                 </div>
@@ -36,11 +55,11 @@
                                 <p class=""><strong>題目：</strong> {{ result.question_text }}</p>
                                 <div class="question-info">
                                     {% for source in result.source_filename %}
-                                    <a href={{ source_path }}/{{ source }} target="_blank">{{ source }}</a>
+                                    <a href={{ source_path }} /{{ source }} target="_blank">{{ source }}</a>
                                     {% endfor %}
                                     &nbsp;{{ result.book_source }}&nbsp;p.{{ result.page_number }}
                                 </div>
-                                <ul class="search-result">
+                                <ul class="search-result list-unstyled">
                                     {% set labels = ['A', 'B', 'C', 'D'] %}
                                     {% for option in result.options %}
                                     {% if option == result.answer %}
@@ -55,7 +74,7 @@
                             {% endif %}
                         </div>
                     </div>
-            </div>
+                </div>
         </main>
     </div>
 </div>

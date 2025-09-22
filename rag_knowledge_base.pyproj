@@ -28,8 +28,11 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="rag_knowledge_base\clustering.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="rag_knowledge_base\pdftojson.py" />
-    <Compile Include="rag_tag_helper.py">
+    <Compile Include="rag_knowledge_base\tag_helper.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="runserver.py" />

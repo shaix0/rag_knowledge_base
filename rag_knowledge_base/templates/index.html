@@ -13,6 +13,12 @@
                         <div class="input-group">
                             <input type="hidden" name="searchtype" value="q">
                             <input type="text" class="form-control" name="q" placeholder="請輸入關鍵字搜尋..." aria-label="搜尋" style="margin-inline-end: 5px; border-radius: var(--bs-border-radius);">
+                            <select class="form-select" name="booksource" aria-label="搜尋">
+                                <option selected disabled>請選擇來源書籍...</option>
+                                <option value="常用醫護術語">常用醫護術語</option>
+                                <option value="醫學資訊管理學">醫學資訊管理學</option>
+                                <option value="時事">時事</option>
+                            </select>
                             <div class="input-group-append">
                                 <button class="btn btn-primary" type="submit">搜尋</button>
                             </div>
@@ -52,8 +58,8 @@
                         <div id="search-results">
                             {% for result in results %}
                             <div class="search-results">
-                                <p class=""><strong>題目：</strong> {{ result.question_text }}</p>
-                                <div class="question-info">
+                                <p class="question-text"><strong>題目：</strong> {{ result.question_text }}</p>
+                                <div class="question-info" style="display: none;">
                                     {% for source in result.source_filename %}
                                     <a href={{ source_path }} /{{ source }} target="_blank">{{ source }}</a>
                                     {% endfor %}
@@ -81,7 +87,7 @@
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 <script>
-    $(document).ready(function () {
+    $(document).ready( function () {
         $('#toggle-answer').on('click', function () {
             $('.answer').toggleClass('answer_highlight');
 
@@ -90,6 +96,12 @@
             } else {
                 $(this).text("顯示答案");
             }
+        });
+    });
+
+    $(function () {
+        $(".question-text").click(function () {
+            $(this).next(".question-info").slideToggle("slow");
         });
     });
 </script>

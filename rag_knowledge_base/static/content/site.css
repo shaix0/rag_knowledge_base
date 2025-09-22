@@ -20,6 +20,10 @@ textarea {
     /*border-top: var(--bs-border-width) solid var(--bs-border-color);*/
 }
 
+.question-text {
+    cursor: pointer;
+}
+
 .answer_highlight {
     color: var(--bs-blue);
     font-weight: bold;

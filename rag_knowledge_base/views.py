@@ -9,7 +9,7 @@ import json
 import os
 import re
 
-json_path = 'all_questions_with_keywords.json'# os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', "all_questions.json")
+json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_tags.json')
 try:
     with open(json_path, 'r', encoding='utf-8-sig') as f:
         KNOWLEDGE_BASE = json.load(f)
@@ -47,8 +47,9 @@ def home():
 
 @app.route('/search')
 def search():
+    tags=get_tag()
     search_type = request.args.get('searchtype')
-    """處理搜尋請求的路由。"""
+    book_source = request.args.get('booksource', '')
     query = request.args.get(search_type, '').lower()
     match = False
 
@@ -67,8 +68,10 @@ def search():
                 for tag in item["標籤"]:
                     if (query in tag.lower()) :
                         match = True
+            
+            book_match = (not book_source or item.get("來源書籍", "") == book_source)
 
-            if match :
+            if match and book_match:
                 search_results.append({
                     "question_text": item.get("題目", ""),
                     "options": item.get("選項", []),
@@ -90,41 +93,9 @@ def search():
         results=search_results,
         search_query=query,
         result_word=result_word,
-        source_path=os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師')
+        source_path=os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師'),
+        all_tags=tags
     )
-
-def search_by_keyword(query):
-    results = []
-    for item in KNOWLEDGE_BASE:
-        if (
-            ("題目" in item and query in item["題目"].lower()) or
-            ("答案" in item and query in item["答案"].lower())
-        ):
-            results.append({
-                "question_text": item.get("題目", ""),
-                "options": item.get("選項", []),
-                "book_source": item.get("來源書籍", ""),
-                "page_number": item.get("頁次", ""),
-                "source_filename": item.get("來源檔案", ""),
-                "answer": item.get("答案", ""),
-                "keywords": item.get("關鍵字", [])
-            })
-    return results
-
-def search_by_tag(search_tag):
-    results = []
-    for item in KNOWLEDGE_BASE:
-        if search_tag in [tag.lower() for tag in item.get('關鍵字', [])]:
-            results.append({
-                "question_text": item.get("題目", ""),
-                "options": item.get("選項", []),
-                "book_source": item.get("來源書籍", ""),
-                "page_number": item.get("頁次", ""),
-                "source_filename": item.get("來源檔案", ""),
-                "answer": item.get("答案", ""),
-                "keywords": item.get("關鍵字", [])
-            })
-    return results
 
 @app.route('/about')
 def about():

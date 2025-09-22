@@ -58,7 +58,7 @@
                         <div id="search-results">
                             {% for result in results %}
                             <div class="search-results">
-                                <p class="question-text"><strong>題目：</strong> {{ result.question_text }}{{result.score}}</p>
+                                <p class="question-text"><strong>題目：</strong> {{ result.question_text }}</p>
                                 <div class="question-info" style="display: none;">
                                     {% for source in result.source_filename %}
                                     <a href={{ source_path }} / {{ source }} target="_blank">{{ source }}</a>

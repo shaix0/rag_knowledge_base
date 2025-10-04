@@ -3,6 +3,7 @@ import json
 import re
 import os
 
+
 def parse_questions_from_text(text, exam_date, source_filename):
     """
     解析原始文本以提取題目、答案、選項、出處等資訊，並將元數據加入其中。
@@ -177,3 +178,71 @@ print(f"\n所有 {len(all_extracted_questions)} 個題目已成功整理並儲�
 
 merge_questions(output_filename)
 
+#import rag_knowledge_base.tag_helper
+
+def embeddings():
+    import os
+    import json
+    from mistralai import Mistral
+
+    # 從環境變數中取得 API 金鑰
+    api_key = os.getenv("MISTRAL_API_KEY")
+    if not api_key:
+        print("請設定 MISTRAL_API_KEY 環境變數。")
+        return
+
+    # 載入題目 JSON 檔案
+    #json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_tags.json')
+    json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions.json')
+
+    try:
+        with open(json_path, 'r', encoding='utf-8-sig') as f:
+            questions = json.load(f)
+        print("成功載入題目檔案。")
+    except FileNotFoundError:
+        print(f"錯誤: 找不到題目檔案於 {json_path}")
+        return
+    except json.JSONDecodeError as e:
+        print(f"解析 JSON 檔案時發生錯誤: {e}")
+        return
+
+    client = Mistral(api_key=api_key)
+    model = "mistral-embed"
+
+    # 提取所有題目，將其儲存到一個列表中
+    questions_text = [item.get("題目", "") for item in questions if "題目" in item]
+
+    if not questions_text:
+        print("錯誤: 題目列表中沒有找到任何題目。")
+        return
+
+    # 為所有題目生成嵌入向量
+    try:
+        embeddings_batch_response = client.embeddings.create(
+            model=model,
+            inputs=questions_text,
+        )
+        # 從回應中提取嵌入向量
+        embeddings_list = [item.embedding for item in embeddings_batch_response.data]
+        print("成功生成所有題目的嵌入向量。")
+    except Exception as e:
+        print(f"生成嵌入向量時發生錯誤: {e}")
+        return
+
+    # 將題目及其嵌入向量儲存為 JSON 檔案
+    output_data = []
+    # 遍歷原始題目和新生成的向量，將它們組合起來
+    for i, item in enumerate(questions):
+        if i < len(embeddings_list):
+            item["embedding"] = embeddings_list[i]
+            output_data.append(item)
+    
+    output_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'questions_with_embeddings.json')
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(output_data, f, ensure_ascii=False, indent=4)
+        print(f"成功將嵌入向量儲存至 {output_path}")
+    except IOError as e:
+        print(f"寫入檔案時發生錯誤: {e}")
+
+embeddings()

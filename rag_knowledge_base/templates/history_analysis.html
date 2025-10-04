@@ -1,0 +1,130 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+<div class="container my-5">
+    <style>
+        .history-stat-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+    </style>
+
+    <h1 class="text-center mb-4 text-primary">題庫全域錯誤分析</h1>
+
+    <!-- 返回測驗按鈕 -->
+    <div class="view-control text-center mb-4">
+        <a href="/quiz" class="btn btn-outline-primary">← 返回測驗頁面</a>
+    </div>
+
+    <!-- 載入指示器 -->
+    <div id="history-loading-spinner" class="text-center my-5">
+        <div class="spinner-border text-primary" role="status"><span class="visually-hidden">載入中...</span></div>
+        <p class="mt-2 text-muted">正在載入題庫分析數據...</p>
+    </div>
+
+    <!-- 分析內容 -->
+    <div id="history-content" class="d-none">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">🔥 易錯題 (全域錯誤次數前五名)</h4>
+            </div>
+            <div class="card-body" id="frequent-mistakes">
+                <!-- 數據將由 JS 填充 -->
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-dark">
+                <h4 class="mb-0">📚 易錯類型 (來源書籍全域錯誤次數統計)</h4>
+            </div>
+            <div class="card-body" id="frequent-types">
+                <!-- 數據將由 JS 填充 -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    // --- 從後端 (Flask/Jinja) 載入的 JSON 題庫數據 ---
+    // 假設 Flask 路由已將 'all_questions_with_tags.json' 的內容作為 'knowledge_base' 變數傳入。
+    const globalKnowledgeBase = {{ knowledge_base | tojson }};
+
+    // --- Function to Fetch and Analyze History ---
+    async function loadHistory() {
+        const frequentMistakesDiv = document.getElementById('frequent-mistakes');
+        const frequentTypesDiv = document.getElementById('frequent-types');
+        const loadingSpinner = document.getElementById('history-loading-spinner');
+        const historyContent = document.getElementById('history-content');
+
+        // 檢查數據是否有效
+        if (!globalKnowledgeBase || globalKnowledgeBase.length === 0) {
+            loadingSpinner.classList.add('d-none');
+            historyContent.classList.remove('d-none');
+            frequentMistakesDiv.innerHTML = '<p class="text-danger">無法載入題庫數據或題庫為空。</p>';
+            frequentTypesDiv.innerHTML = '<p class="text-danger">無法載入題庫數據或題庫為空。</p>';
+            return;
+        }
+
+        // 初始化顯示
+        frequentMistakesDiv.innerHTML = '<p class="text-primary">正在從題庫數據中計算...</p>';
+        frequentTypesDiv.innerHTML = '<p class="text-primary">正在從題庫數據中計算...</p>';
+
+        // 1. 處理易錯題 (根據 error_count 排序)
+        const sortedMistakes = globalKnowledgeBase
+            .filter(q => q.error_count > 0) // 只分析有錯誤次數的題目
+            .sort((a, b) => b.error_count - a.error_count) // 根據 JSON 中的 error_count 降序排列
+            .slice(0, 5); // 只取前五名
+
+        if (sortedMistakes.length === 0) {
+            frequentMistakesDiv.innerHTML = '<p class="text-success">目前所有題目全域錯誤次數均為 0。</p>';
+        } else {
+            frequentMistakesDiv.innerHTML = sortedMistakes.map((m, index) => `
+                <div class="history-stat-item">
+                    <p class="mb-1 fw-bold">第 ${index + 1} 名：${m.題目}</p>
+                    <p class="mb-0 text-danger">全域錯誤次數：${m.error_count}</p>
+                    <p class="mb-0 text-muted">來源：${m.來源書籍}</p>
+                </div>
+            `).join('');
+        }
+
+        // 2. 處理易錯類型 (來源書籍錯誤次數統計)
+        const typeCounts = {};
+
+        globalKnowledgeBase.forEach(question => {
+            const typeKey = question['來源書籍'] || '未分類';
+            // 將所有屬於該來源書籍的 error_count 累加
+            const errors = question.error_count || 0; // 確保 error_count 有值
+            typeCounts[typeKey] = (typeCounts[typeKey] || 0) + errors;
+        });
+
+        const sortedTypes = Object.entries(typeCounts)
+            .filter(([, count]) => count > 0) // 只顯示有錯誤的類型
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5); // 只取前五名
+
+        if (sortedTypes.length === 0) {
+            frequentTypesDiv.innerHTML = '<p class="text-success">目前所有分類錯誤總次數均為 0。</p>';
+        } else {
+            frequentTypesDiv.innerHTML = sortedTypes.map(([type, count], index) => `
+                <div class="history-stat-item">
+                    <p class="mb-1 fw-bold">第 ${index + 1} 名來源書籍：${type}</p>
+                    <p class="mb-0 text-danger">累積錯誤總次數：${count}</p>
+                </div>
+            `).join('');
+        }
+
+        // 隱藏載入指示器，顯示內容
+        loadingSpinner.classList.add('d-none');
+        historyContent.classList.remove('d-none');
+    }
+
+    // 頁面載入時啟動分析
+    window.onload = loadHistory;
+</script>
+
+
+{% endblock %}

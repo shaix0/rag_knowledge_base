@@ -1,3 +1,26 @@
+:root {
+    --text: #000000;
+    --subt: #626262;
+    --l-te: #fff;
+    --load1: #deeef1;
+    --load2: #a6cde2;
+    --bg1: #a6cde2;
+    --bg2: #fff;
+    --menu: #ffffffbd;
+    --hmenu: #ffffff;
+    --list: #0000005e;
+    --hlist: #00000094;
+    --l-bg: #d9e0e3a3;
+    --c-bg: #fff;
+    --goobl: #e8f0fe;
+    --blu11: #6C9AD8;
+    --pur11: #D7D5E3;
+    --gry18: #E7E7E7;
+    --gre18: #7EC2B7;
+    --dbr20: #AD927F;
+    --brn20: #DECFC8;
+}
+
 body {
     padding-top: 50px;
     padding-bottom: 20px;
@@ -9,6 +32,11 @@ body {
     padding-right: 15px;
 }
 
+.hide {
+    opacity: 0;
+    transition: .65s;
+}
+
 /* Set width on the form input elements since they're 100% wide by default */
 input,
 select,
@@ -16,8 +44,11 @@ textarea {
     /*max-width: 280px;*/
 }
 
-.search-result {
-    /*border-top: var(--bs-border-width) solid var(--bs-border-color);*/
+.all_questions {
+    border: var(--bs-border-width) solid var(--bs-gray);
+    border-radius: 15px;
+    padding: 15px;
+    margin-block: 5px;
 }
 
 .question-text {
@@ -46,8 +77,16 @@ textarea {
     --bs-gradient: none
 }
 
+/*#insert-window, .insert-bg {
+    pointer-events: none; 
+    opacity: 0;
+    transition: opacity 0.3s; 
 
-
+#insert-window.active,
+.insert-bg.active {
+    pointer-events: auto; 
+    opacity: 1;
+} */
 
 /* styles for validation helpers */
 .field-validation-error {
@@ -72,4 +111,59 @@ input[type="checkbox"].input-validation-error {
 
 .validation-summary-valid {
     display: none;
+}
+
+#insert-window {
+    pointer-events: none;
+    background: var(--c-bg);
+    color: var(--text);
+    padding: 15px;
+    border: var(--bs-border-width) solid var(--bs-gray);
+    border-radius: 20px;
+    width: 60vw;
+    position: fixed;
+    z-index: 5;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.insert-bg {
+    pointer-events: none;
+    position: fixed;
+    z-index: 5;
+    width: 100%;
+    height: 100%;
+    background: var(--l-bg);
+    backdrop-filter: blur(3px);
+    transition: .65s;
+}
+#insert-w-close{
+  display: block;
+  width: 20px;
+  float: right;
+  fill: var(--text);
+}
+.insert-input{
+  width: -webkit-fill-available;
+  resize: none;
+}
+.insert-input:focus{
+  outline: none;
+}
+#insert-sub{
+  height: 30%;
+}
+.insert-field{
+  width: -webkit-fill-available;
+  display: inline-block;
+  margin-block-end: 15px;
+}
+#insert-submit{
+  display: block;
+  float: right;
+  color: var(--text);
+  background: var(--c-bg);
+  padding: 5 10 5;
+  border-radius: 10px;
+  border: 1px solid var(--text);
 }

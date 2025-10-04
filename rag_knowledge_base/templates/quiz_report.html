@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>測驗成績統計與報表</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Inter 字體 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- 引入 Chart.js for 數據可視化 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+
+        .container-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6 border-b-4 border-indigo-500 pb-2">📊 測驗成績分析報告</h1>
+
+        <!-- 總成績概覽 -->
+        <div id="summary-section" class="container-card bg-white p-6 rounded-xl mb-8">
+            <h2 class="text-2xl font-bold text-indigo-700 mb-4">總成績概覽</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                <div class="bg-indigo-100 p-4 rounded-lg">
+                    <p class="text-sm text-indigo-600 font-semibold">總題數</p>
+                    <p id="total-questions" class="text-4xl font-extrabold text-indigo-900 mt-1">0</p>
+                </div>
+                <div class="bg-green-100 p-4 rounded-lg">
+                    <p class="text-sm text-green-600 font-semibold">答對題數 / 總分</p>
+                    <p id="correct-count" class="text-4xl font-extrabold text-green-900 mt-1">0 / 0</p>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded-lg">
+                    <p class="text-sm text-yellow-600 font-semibold">總正確率</p>
+                    <p id="overall-accuracy" class="text-4xl font-extrabold text-yellow-900 mt-1">0%</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 圖表區塊 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+
+            <!-- 圓餅圖：題目分佈 -->
+            <div class="lg:col-span-1 container-card bg-white p-6 rounded-xl flex flex-col items-center">
+                <h2 class="text-xl font-bold text-gray-700 mb-4">章節（來源書籍）題目分佈</h2>
+                <div class="w-full h-80">
+                    <canvas id="topicDistributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 長條圖：章節正確率 -->
+            <div class="lg:col-span-2 container-card bg-white p-6 rounded-xl">
+                <h2 class="text-xl font-bold text-gray-700 mb-4">弱點章節分析 (正確率長條圖)</h2>
+                <div class="w-full h-96">
+                    <canvas id="accuracyBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 詳細章節成績表格 -->
+        <div class="container-card bg-white p-6 rounded-xl">
+            <h2 class="text-2xl font-bold text-gray-700 mb-4">📚 詳細章節成績</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                來源書籍 (章節)
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                總題數
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                答對題數
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                正確率
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                弱點指標
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="accuracy-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- 數據將由 JS 填充 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ----------------------------------------------------------------------
+        // 測驗結果數據由後端 Flask (app.py) 傳入
+        // ----------------------------------------------------------------------
+
+        // 從後端接收的測驗結果數據（包含 book_source 和 is_correct）
+        const quizResults = {{ quiz_results | tojson | safe }};
+
+        // 每題分數為 2 分
+        const SCORE_PER_QUESTION = 2;
+
+        // 顏色配置 (用於圖表)
+        const ACCURACY_COLORS = [
+            '#4f46e5', // Indigo
+            '#10b981', // Green
+            '#f59e0b', // Amber
+            '#ef4444', // Red
+            '#06b6d4', // Cyan
+            '#9333ea', // Violet
+            '#be185d', // Pink
+            '#374151', // Gray
+        ];
+
+        /**
+         * 處理測驗結果，計算總成績和各章節的準確率。
+         * @param {Array} results - 測驗結果陣列。
+         * @returns {Object} 包含總結和章節明細的物件。
+         */
+        function analyzeResults(results) {
+            let totalQuestions = results.length;
+            let correctCount = 0;
+            const bookAccuracy = {};
+
+            results.forEach(item => {
+                // 處理來源書籍，如果為空則設為 '未知章節'
+                const book = item.book_source || '未知章節';
+                const isCorrect = item.is_correct;
+
+                // 1. 總計正確題數
+                if (isCorrect) {
+                    correctCount++;
+                }
+
+                // 2. 初始化或更新章節數據
+                if (!bookAccuracy[book]) {
+                    bookAccuracy[book] = { total: 0, correct: 0, accuracy: 0, color: '' };
+                }
+
+                bookAccuracy[book].total++;
+                if (isCorrect) {
+                    bookAccuracy[book].correct++;
+                }
+            });
+
+            // 3. 計算各章節準確率並分配顏色
+            const sortedBooks = Object.keys(bookAccuracy).sort();
+            sortedBooks.forEach((book, index) => {
+                const data = bookAccuracy[book];
+                data.accuracy = data.total > 0 ? (data.correct / data.total) * 100 : 0;
+                // 分配顏色
+                data.color = ACCURACY_COLORS[index % ACCURACY_COLORS.length];
+            });
+
+            return {
+                totalQuestions,
+                correctCount,
+                bookAccuracy,
+            };
+        }
+
+        /**
+         * 渲染成績概覽區塊。
+         * @param {Object} summary - 成績總結數據。
+         */
+        function renderSummary(summary) {
+            const { totalQuestions, correctCount } = summary;
+            const totalScore = correctCount * SCORE_PER_QUESTION;
+            const overallAccuracy = totalQuestions > 0 ? (correctCount / totalQuestions * 100).toFixed(1) : 0;
+
+            document.getElementById('total-questions').textContent = totalQuestions;
+            document.getElementById('correct-count').textContent = `${correctCount} / ${totalScore}`;
+            document.getElementById('overall-accuracy').textContent = `${overallAccuracy}%`;
+        }
+
+        /**
+         * 渲染詳細章節成績表格。
+         * @param {Object} bookAccuracy - 各章節的成績數據。
+         */
+        function renderTable(bookAccuracy) {
+            const tbody = document.getElementById('accuracy-table-body');
+            tbody.innerHTML = '';
+
+            // 將章節數據轉換為陣列並按準確率升序排列 (弱點在前)
+            const sortedEntries = Object.entries(bookAccuracy)
+                .sort(([, a], [, b]) => a.accuracy - b.accuracy);
+
+            sortedEntries.forEach(([book, data]) => {
+                const row = tbody.insertRow();
+                row.className = 'hover:bg-gray-100';
+
+                // 弱點指標：低於 60% 標紅
+                // 只有題目數大於 1 且正確率低於 60% 才標記為「需加強」
+                const isWeakSpot = data.accuracy < 60 && data.total > 1;
+
+                const indicatorClass = isWeakSpot ? 'bg-red-500 text-white font-semibold rounded-full p-1 text-xs text-center' : 'bg-green-500 text-white rounded-full p-1 text-xs text-center';
+                const indicatorText = isWeakSpot ? '⚠️ 需加強' : '✅ 掌握';
+
+                // 來源書籍 (章節)
+                row.insertCell().textContent = book;
+
+                // 總題數
+                row.insertCell().textContent = data.total;
+
+                // 答對題數
+                row.insertCell().textContent = data.correct;
+
+                // 正確率
+                row.insertCell().textContent = `${data.accuracy.toFixed(1)}%`;
+
+                // 弱點指標
+                const indicatorCell = row.insertCell();
+                indicatorCell.innerHTML = `<span class="${indicatorClass}" style="min-width: 80px; display: inline-block;">${indicatorText}</span>`;
+            });
+        }
+
+        // Chart 實例儲存，用於避免重複渲染
+        let distributionChartInstance = null;
+        let accuracyChartInstance = null;
+
+        /**
+         * 渲染題目分佈圓餅圖 (Pie Chart)。
+         * @param {Object} bookAccuracy - 各章節的成績數據。
+         */
+        function renderDistributionChart(bookAccuracy) {
+            if (distributionChartInstance) {
+                distributionChartInstance.destroy();
+            }
+
+            const labels = Object.keys(bookAccuracy);
+            const data = labels.map(book => bookAccuracy[book].total);
+            const colors = labels.map(book => bookAccuracy[book].color);
+
+            distributionChartInstance = new Chart(document.getElementById('topicDistributionChart'), {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '題目數量',
+                        data: data,
+                        backgroundColor: colors,
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        title: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        /**
+         * 渲染章節正確率長條圖 (Bar Chart)。
+         * @param {Object} bookAccuracy - 各章節的成績數據。
+         */
+        function renderAccuracyChart(bookAccuracy) {
+            if (accuracyChartInstance) {
+                accuracyChartInstance.destroy();
+            }
+
+            // 轉換為陣列，並按正確率升序排列 (低分在前，方便查看弱點)
+            const sortedEntries = Object.entries(bookAccuracy)
+                .sort(([, a], [, b]) => a.accuracy - b.accuracy);
+
+            const labels = sortedEntries.map(([book]) => book);
+            const data = sortedEntries.map(([, data]) => parseFloat(data.accuracy.toFixed(1)));
+            const colors = sortedEntries.map(([, data]) => data.color);
+
+            accuracyChartInstance = new Chart(document.getElementById('accuracyBarChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '正確率 (%)',
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: colors,
+                        borderWidth: 1,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // 顯示為水平長條圖
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: '正確率 (%)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false,
+                        },
+                        title: {
+                            display: true,
+                            text: '章節正確率 (分數越低越需優先加強)'
+                        }
+                    }
+                }
+            });
+        }
+
+
+        // --- 主執行函數 ---
+        window.onload = function() {
+            if (!quizResults || quizResults.length === 0) {
+                document.getElementById('summary-section').innerHTML = '<p class="text-center text-xl text-red-500">❌ 錯誤：找不到測驗結果數據可供分析。請先完成測驗。</p>';
+                return;
+            }
+
+            // 1. 分析數據
+            const summary = analyzeResults(quizResults);
+
+            // 2. 渲染總結
+            renderSummary(summary);
+
+            // 3. 渲染詳細表格
+            renderTable(summary.bookAccuracy);
+
+            // 4. 渲染圓餅圖
+            renderDistributionChart(summary.bookAccuracy);
+
+            // 5. 渲染長條圖 (弱點分析)
+            renderAccuracyChart(summary.bookAccuracy);
+        };
+
+    </script>
+</body>
+</html>

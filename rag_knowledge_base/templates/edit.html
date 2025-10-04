@@ -1,38 +1,282 @@
 ﻿{% extends "layout.html" %}
 
 {% block content %}
+<style>
+    /* 收藏按鈕的基礎樣式 */
+    .favorite-btn {
+        cursor: pointer;
+        border: none;
+        background: none;
+        padding: 0;
+        color: #ccc; /* 預設顏色: 灰色 (未收藏) */
+        transition: color 0.2s;
+        outline: none;
+        vertical-align: top; /* 使圖標與文字對齊 */
+        margin-right: 5px;
+    }
 
-<h2>{{ title }}.</h2>
-<h3>{{ message }}</h3>
+    /* 收藏後的樣式 */
+    .favorite-btn.favorited {
+        color: #ffc107; /* 收藏顏色: 金黃色 */
+    }
 
-<!-- 側邊欄 -->
-<nav class="col-md-2 d-none d-md-block bg-light sidebar">
-    <div class="sidebar-sticky">
-        <h5 class="mt-3">功能選單</h5>
-        <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link active" href="#">首頁</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#">資料管理</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="#">設定</a>
-            </li>
-        </ul>
+    /* 星星圖標的 SVG 樣式 */
+    .star-icon {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* 編輯視窗的樣式 */
+    .insert-bg.hide, #insert-window.hide {
+        display: none !important;
+    }
+    /* 您可能需要添加其他關於 .insert-bg 和 #insert-window 的基礎 CSS 樣式 */
+</style>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- 主內容區 -->
+        <main class="col-md-10 ml-sm-auto px-4">
+            <input type="file" id="fileinput" name="files" accept=".pdf" multiple onchange="afterChooseUploadFile();">
+            <button class="btn btn-primary" onclick="uploadFile();">上傳</button>
+
+            <!-- 搜尋結果區域 -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="col-md-12">
+                        <div id="search-results">
+                            {% for result in results %}
+                            <div class="all_questions" data-question-data='{{ (result | default({}) ) | tojson }}' data-question-index="{{ loop.index0 }}">
+                                <p>
+                                    <!-- 收藏按鈕：根據 result.is_favorite 決定是否加上 favorited 樣式 -->
+                                    <button class="favorite-btn{% if result.is_favorite %} favorited{% endif %}" onclick="toggleFavorite(this, event)">
+                                        <!-- 預設顯示空心星，點擊後透過 JS 處理顏色切換 -->
+                                        <svg class="star-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                                        </svg>
+                                    </button>
+                                    <strong>題目：</strong> {{ result.question_text }}
+                                </p>
+                                <div class="question-info">
+                                    來源：
+                                    {% for source in result.source_filename %}
+                                    <a href={{ source_path }} / {{ source }} target="_blank">{{ source }}</a>
+                                    {% endfor %}
+                                    &nbsp;{{ result.book_source }}&nbsp;p.{{ result.page_number }}
+                                </div>
+                                <ul class="list-unstyled" style="margin: 0px;">
+                                    {% set labels = ['A', 'B', 'C', 'D'] %}
+                                    {% for option in result.options %}
+                                    {% if option == result.answer %}
+                                    <li class="answer_highlight">({{ labels[loop.index0] }}) {{ option }}</li>
+                                    {% else %}
+                                    <li>({{ labels[loop.index0] }}) {{ option }}</li>
+                                    {% endif %}
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-</nav>
 
-<address>
-    One Microsoft Way<br />
-    Redmond, WA 98052-6399<br />
-    <abbr title="Phone">P:</abbr>
-    425.555.0100
-</address>
+    <!-- 編輯視窗 -->
+    <div>
+        <div class="insert-bg hide"></div>
+        <div id="insert-window" class="hide">
+            <form method="GET" action="/update_question">
+                <span id="insert-w-close">
+                    <svg focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
+                    </svg>
+                </span>
+                <div class="insert-field">
+                    <label class="insert-t">題目：</label>
+                    <input type="text" class="insert-input" id="insert-question">
+                </div>
+                <div class="insert-field">
+                    <label class="insert-t">選項：</label>
+                    <textarea class="insert-input" id="insert-option"></textarea>
+                </div>
+                <div class="insert-field">
+                    <label class="insert-t">答案：</label>
+                    <input type="text" class="insert-input" id="insert-answer">
+                </div>
+                <div class="insert-field">
+                    <label class="insert-t">來源書籍：</label>
+                    <input type="text" class="insert-input" id="insert-sbook">
+                </div>
+                <div class="insert-field">
+                    <label class="insert-t">頁次：</label>
+                    <input type="text" class="insert-input" id="insert-page">
+                </div>
+                <div class="insert-field">
+                    <label class="insert-t">來源檔案：</label>
+                    <input type="text" class="insert-input" id="insert-sfile">
+                </div>
+                <button id="update-submit">確定</button>
+            </form>
+        </div>
+    </div>
+</div>
 
-<address>
-    <strong>Support:</strong>   <a href="mailto:Support@example.com">Support@example.com</a><br />
-    <strong>Marketing:</strong> <a href="mailto:Marketing@example.com">Marketing@example.com</a>
-</address>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+<script>
+    function uploadFile() {
+        // ... (原有的 uploadFile 函式不變)
+        const files = $('#fileinput')[0].files;
 
+        if (files.length === 0) {
+            alert('請先選擇一個或多個 PDF 檔案！');
+            return;
+        }
+
+        const formData = new FormData();
+
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+
+        $.ajax({
+            url: '/upload_file',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+
+            success: function (data, textStatus, jqXHR) {
+                alert('檔案上傳並處理成功！');
+                console.log('後端處理結果:', data);
+            },
+
+            error: function (jqXHR, textStatus, errorThrown) {
+                console.error('上傳或處理時發生錯誤。HTTP 狀態:', jqXHR.status);
+                console.error('錯誤詳情:', errorThrown);
+                let errorMessage = '上傳或處理失敗，請檢查控制台。';
+                try {
+                    const errorData = jqXHR.responseJSON;
+                    if (errorData && errorData.error) {
+                        errorMessage = '處理失敗: ' + errorData.error;
+                    }
+                } catch (e) {
+                    // pass
+                }
+                alert(errorMessage);
+            }
+        });
+    }
+
+    // --- 新增收藏功能邏輯 ---
+    function toggleFavorite(buttonElement, event) {
+        // 阻止點擊收藏按鈕時觸發題目本身的編輯功能
+        event.stopPropagation();
+
+        // 1. 取得最近的題目容器
+        const questionContainer = $(buttonElement).closest('.all_questions');
+        const questionData = questionContainer.data("question-data");
+
+        if (!questionData) {
+            alert("無法獲取題目數據，收藏失敗！");
+            return;
+        }
+
+        // 2. 執行 AJAX 請求，將該題目發送給後端
+        $.ajax({
+            url: '/toggle_favorite', // 假設這是後端處理收藏的路由
+            type: 'POST',
+            data: JSON.stringify(questionData), // 傳遞完整的題目對象
+            contentType: 'application/json',
+            success: function (response) {
+                // 3. 成功後更新按鈕的樣式
+                $(buttonElement).toggleClass('favorited');
+                let action = $(buttonElement).hasClass('favorited') ? '已收藏' : '已取消收藏';
+                console.log(`題目 "${questionData.question_text.substring(0, 15)}..." ${action}`);
+                alert(`題目 ${action}！`);
+            },
+            error: function (jqXHR) {
+                const errorMsg = jqXHR.responseJSON ? jqXHR.responseJSON.error : '伺服器錯誤';
+                console.error("收藏操作失敗:", errorMsg);
+                alert("收藏操作失敗: " + errorMsg);
+            }
+        });
+    }
+
+
+    let currentEditingQuestion = null;
+
+    // 點擊題目，打開編輯視窗並帶入對應資料
+    $(document).on('click', '.all_questions', function () {
+        // ... (原有的編輯邏輯不變)
+        const questionData = $(this).data("question-data");
+        const index = $(this).data("question-index");
+
+        if (!questionData) {
+            console.warn("⚠️ 無法從題目元素中提取數據");
+            return;
+        }
+
+        currentEditingQuestion = { ...questionData, original_index: index };
+
+        // 帶入編輯表單
+        $("#insert-question").val(questionData.question_text || "");
+        $("#insert-option").val((questionData.options || []).join("\n"));
+        $("#insert-answer").val(questionData.answer || "");
+        $("#insert-sbook").val(questionData.book_source || "");
+        $("#insert-page").val(questionData.page_number || "");
+        $("#insert-sfile").val((questionData.source_filename || []).join(", "));
+
+        // 顯示編輯視窗
+        $("#insert-window, .insert-bg").removeClass("hide")
+            .css("pointer-events", "auto");
+    });
+
+    // 關閉編輯視窗
+    $(document).on('click', '#insert-w-close, .insert-bg', function () {
+        // ... (原有的關閉邏輯不變)
+        $("#insert-window, .insert-bg").addClass("hide")
+            .css("pointer-events", "");
+    });
+
+    // 送出更新
+    $("#update-submit").on('click', function (e) {
+        // ... (原有的提交更新邏輯不變)
+        e.preventDefault();
+
+        if (!currentEditingQuestion) {
+            alert("沒有正在編輯的題目");
+            return;
+        }
+
+        // 從表單讀回資料
+        const updatedData = {
+            ...currentEditingQuestion,
+            question_text: $("#insert-question").val(),
+            options: $("#insert-option").val().split("\n"),
+            answer: $("#insert-answer").val(),
+            book_source: $("#insert-sbook").val(),
+            page_number: $("#insert-page").val(),
+            source_filename: $("#insert-sfile").val().split(",").map(s => s.trim())
+        };
+
+        $.ajax({
+            url: '/update_question',
+            type: 'POST',
+            data: JSON.stringify(updatedData),
+            contentType: 'application/json',
+            success: function (response) {
+                alert("更新成功！");
+                console.log("更新成功:", response);
+                location.reload();
+            },
+            error: function (jqXHR) {
+                const errorMsg = jqXHR.responseJSON ? jqXHR.responseJSON.error : '未知錯誤';
+                console.error("更新失敗:", errorMsg);
+                alert("更新失敗: " + errorMsg);
+            }
+        });
+    });
+</script>
 {% endblock %}

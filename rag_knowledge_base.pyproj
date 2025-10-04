@@ -32,6 +32,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="rag_knowledge_base\pdftojson.py" />
+    <Compile Include="rag_knowledge_base\picture.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="rag_knowledge_base\tag_helper.py">
       <SubType>Code</SubType>
     </Compile>
@@ -50,11 +53,10 @@
     <Folder Include="rag_knowledge_base\templates\" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="rag_knowledge_base\information\醫學資訊管理師\2023年11月.pdf" />
-    <Content Include="rag_knowledge_base\information\醫學資訊管理師\2023年4月.pdf" />
-    <Content Include="rag_knowledge_base\information\醫學資訊管理師\2024年11月.pdf" />
-    <Content Include="rag_knowledge_base\information\醫學資訊管理師\2024年4月.pdf" />
+    <Content Include="rag_knowledge_base\information\醫學資訊管理師\2017年4月.pdf" />
     <Content Include="rag_knowledge_base\information\醫學資訊管理師\2025年4月.pdf" />
+    <Content Include="rag_knowledge_base\templates\history_analysis.html" />
+    <Content Include="rag_knowledge_base\templates\quiz_report.html" />
     <Content Include="requirements.txt" />
     <Content Include="rag_knowledge_base\static\content\bootstrap.css" />
     <Content Include="rag_knowledge_base\static\content\bootstrap.min.css" />
@@ -78,7 +80,7 @@
     <Content Include="rag_knowledge_base\static\scripts\respond.js" />
     <Content Include="rag_knowledge_base\static\scripts\respond.min.js" />
     <Content Include="rag_knowledge_base\static\scripts\_references.js" />
-    <Content Include="rag_knowledge_base\templates\about.html" />
+    <Content Include="rag_knowledge_base\templates\quiz.html" />
     <Content Include="rag_knowledge_base\templates\edit.html" />
     <Content Include="rag_knowledge_base\templates\index.html" />
     <Content Include="rag_knowledge_base\templates\layout.html" />

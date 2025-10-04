@@ -1,0 +1,317 @@
+﻿<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title | default('醫學資訊管理師測驗') }}</title>
+    <!-- 引入 Bootstrap 5 (用於 card, form-check, btn, layout 等樣式) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .card {
+            border-radius: 12px;
+        }
+
+        .card-header {
+            border-bottom: none;
+        }
+
+        .btn-lg {
+            border-radius: 8px;
+        }
+        /* 避免使用 alert/confirm，改用 custom UI */
+        #custom-alert {
+            display: none;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        /* 評分結果樣式 */
+        .question-card.correct {
+            border: 2px solid #198754;
+        }
+
+        .question-card.incorrect {
+            border: 2px solid #dc3545;
+        }
+
+        .result-footer {
+            background-color: #f8f9fa;
+            border-top: 1px dashed #ced4da;
+            padding: 10px 15px;
+        }
+
+        .result-correct-badge {
+            color: #198754;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .result-incorrect-badge {
+            color: #dc3545;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        /* 模式選擇樣式 */
+        .mode-selection-card {
+            max-width: 600px;
+            width: 100%;
+            margin: auto;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            min-height: 50vh;
+        }
+
+        .btn-mode {
+            padding: 20px 30px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-align: left;
+        }
+
+        .btn-mode:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+    </style>
+</head>
+<body>
+    <div id="custom-alert" class="alert alert-warning shadow-lg" role="alert">
+        <strong>注意！</strong> 您還有未作答的題目。
+    </div>
+
+    <div class="container my-5">
+
+        {% if mode == 'selection' %}
+
+        <!-- 模式選擇畫面 -->
+        <div class="mode-selection-card bg-white p-5 d-flex flex-column justify-content-center">
+            <h1 class="text-center text-3xl font-weight-bold text-dark mb-4">🩺 測驗模式選擇</h1>
+            <p class="text-center text-secondary mb-5">請選擇您要開始的練習模式。</p>
+
+            {% if error_message %}
+            <!-- 如果沒有收藏題可練，後端會傳回此錯誤訊息 -->
+            <div class="alert alert-danger text-center">{{ error_message }}</div>
+            {% endif %}
+
+            <div class="d-grid gap-4">
+                <!-- 模式 1: 隨機出題 (正常模式) -->
+                <!-- 連結到 /quiz_page?mode=normal -->
+                <a href="{{ url_for('quiz', mode='normal') }}" class="btn btn-mode btn-primary text-white">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-1 me-4">🎲</span>
+                        <div>
+                            隨機模擬測驗
+                            <div class="text-sm fw-normal mt-1 opacity-75 text-white">從所有題庫中隨機選取題目，進行全面測試。</div>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- 模式 2: 錯題重練 -->
+                <!-- 連結到 /quiz_page?mode=practice -->
+                <a href="{{ url_for('quiz', mode='practice') }}" class="btn btn-mode btn-warning">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-1 me-4">🔁</span>
+                        <div>
+                            錯題重練模式
+                            <div class="text-sm fw-normal mt-1 opacity-75 text-dark">僅包含您過去答錯或標記收藏的題目，加強弱點。</div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        {% else %}
+
+        <!-- 測驗進行畫面 -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="text-center mb-0">{{ title }}</h1>
+            <!-- 返回模式選擇按鈕 -->
+            <a href="{{ url_for('quiz', mode='selection') }}" class="btn btn-secondary btn-sm shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8" />
+                </svg>
+                返回模式選擇
+            </a>
+        </div>
+
+        <p class="text-center text-muted">選擇題 <strong>{{ quiz_data | length }}</strong> 題，請選擇一個最正確的答案。</p>
+
+        <!-- 測驗表單開始 -->
+        <form id="quiz-form">
+            {% for question in quiz_data %}
+
+            {% set q_index = loop.index %}
+
+            <div class="card shadow-sm mb-4 question-card" data-question-index="{{ q_index }}">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">第 {{ q_index }} 題</h5>
+                </div>
+                <div class="card-body">
+                    <!-- 顯示題目 -->
+                    <p class="card-text fw-bold">{{ question.題目 }}</p>
+
+                    <!-- 顯示選項 -->
+                    {% for option in question.選項 %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio"
+                               name="question-{{ q_index }}"
+                               id="q{{ q_index }}-o{{ loop.index }}"
+                               value="{{ option }}">
+                        <label class="form-check-label" for="q{{ q_index }}-o{{ loop.index }}">
+                            {{ option }}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <!-- 預留給結果詳情 -->
+                <div class="card-footer result-footer d-none"></div>
+            </div>
+            {% endfor %}
+
+            <div id="submit-area" class="text-center mt-5">
+                <button type="submit" class="btn btn-success btn-lg px-5">送出測驗</button>
+            </div>
+        </form>
+        <!-- 測驗表單結束 -->
+        <!-- 評分結果區塊 (預設隱藏) -->
+        <div id="result-summary" class="card shadow-lg mb-5 d-none">
+            <div class="card-body text-center">
+                <h2 class="card-title text-primary">測驗結果</h2>
+                <p class="h3 mb-0">總分：<strong id="final-score" class="text-success"></strong> / <span id="max-score"></span></p>
+                <p class="lead mt-2">答對：<strong id="correct-count-summary" class="text-success"></strong> 題 / 答錯：<strong id="incorrect-count-summary" class="text-danger"></strong> 題</p>
+                <!-- 導向報告頁面的按鈕 -->
+                <a id="view-report-btn" class="btn btn-primary mt-3 px-4">查看詳細報告</a>
+            </div>
+        </div>
+
+        {% endif %}
+
+    </div>
+
+    <script>
+        // 只有在測驗模式下才執行 JavaScript 邏輯
+        if (document.getElementById('quiz-form')) {
+            // 將 Jinja 變數安全地傳遞給 JavaScript
+            const quizData = {{ quiz_data | tojson | safe }};
+            const form = document.getElementById('quiz-form');
+            const submitArea = document.getElementById('submit-area');
+            const resultSummary = document.getElementById('result-summary');
+            const customAlert = document.getElementById('custom-alert');
+
+            // 顯示自訂警告訊息
+            function showAlert(message) {
+                customAlert.innerHTML = `<strong>注意！</strong> ${message}`;
+                customAlert.style.display = 'block';
+                setTimeout(() => {
+                    customAlert.style.display = 'none';
+                }, 3000);
+            }
+
+            // 處理表單提交
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                // 1. 收集使用者答案
+                const userAnswers = {};
+                quizData.forEach((_, index) => {
+                    const questionIndex = index + 1;
+                    const radios = document.getElementsByName(`question-${questionIndex}`);
+                    for (const radio of radios) {
+                        if (radio.checked) {
+                            userAnswers[`question-${questionIndex}`] = radio.value;
+                            break;
+                        }
+                    }
+                });
+
+                // 檢查是否有未答題目
+                const totalQuestions = quizData.length;
+                const answeredQuestions = Object.keys(userAnswers).length;
+
+                if (answeredQuestions < totalQuestions) {
+                    showAlert(`您還有 ${totalQuestions - answeredQuestions} 題未作答。`);
+                    return; // 不強制送出
+                }
+
+                // 禁用按鈕防止重複提交
+                const submitButton = form.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                submitButton.textContent = '評分中...';
+
+                // 2. 發送答案和原始題目資料到後端
+                try {
+                    const response = await fetch('/submit_quiz', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            answers: userAnswers,
+                            quiz_data: quizData
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ message: '未知錯誤' }));
+                        throw new Error(`評分處理失敗: ${errorData.message}`);
+                    }
+
+                    const result = await response.json();
+
+                    // 3. 顯示評分結果總結並導向報告
+                    displayResults(result);
+
+                    document.getElementById('view-report-btn').onclick = function() {
+                        window.location.href = '/report_page';
+                    };
+
+                } catch (error) {
+                    console.error('評分失敗:', error);
+                    showAlert('評分時發生錯誤，請稍後再試。錯誤細節：' + error.message);
+                    // 恢復按鈕
+                    submitButton.disabled = false;
+                    submitButton.textContent = '送出測驗';
+                }
+            });
+
+            // 顯示評分結果的函式 (此處僅用於展示總結)
+            function displayResults(result) {
+
+                // 隱藏表單
+                form.classList.add('d-none');
+
+                // 顯示總結
+                if (document.getElementById('final-score')) {
+                    document.getElementById('final-score').textContent = result.total_score;
+                }
+                if (document.getElementById('max-score')) {
+                    document.getElementById('max-score').textContent = result.total_questions * result.score_per_question;
+                }
+                if (document.getElementById('correct-count-summary')) {
+                    document.getElementById('correct-count-summary').textContent = result.correct_count;
+                }
+                if (document.getElementById('incorrect-count-summary')) {
+                    document.getElementById('incorrect-count-summary').textContent = result.total_questions - result.correct_count;
+                }
+
+                // 隱藏提交區，顯示總結區
+                if (submitArea) {
+                    submitArea.classList.add('d-none');
+                }
+                if (resultSummary) {
+                    resultSummary.classList.remove('d-none');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

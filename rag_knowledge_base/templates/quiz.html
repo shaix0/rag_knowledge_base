@@ -1,89 +1,148 @@
-﻿<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title | default('醫學資訊管理師測驗') }}</title>
-    <!-- 引入 Bootstrap 5 (用於 card, form-check, btn, layout 等樣式) -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8f9fa;
-        }
+﻿{% extends "layout.html" %}
 
-        .card {
-            border-radius: 12px;
-        }
+{% block content %}
 
-        .card-header {
-            border-bottom: none;
-        }
+<style>
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8f9fa;
+    }
 
-        .btn-lg {
-            border-radius: 8px;
-        }
-        /* 避免使用 alert/confirm，改用 custom UI */
-        #custom-alert {
-            display: none;
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1050;
-        }
-        /* 評分結果樣式 */
-        .question-card.correct {
-            border: 2px solid #198754;
-        }
+    .card {
+        border-radius: 12px;
+    }
 
-        .question-card.incorrect {
-            border: 2px solid #dc3545;
-        }
+    .card-header {
+        border-bottom: none;
+    }
 
-        .result-footer {
-            background-color: #f8f9fa;
-            border-top: 1px dashed #ced4da;
-            padding: 10px 15px;
-        }
+    .btn-lg {
+        border-radius: 8px;
+    }
+    /* 避免使用 alert/confirm，改用 custom UI */
+    #custom-alert {
+        display: none;
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+    }
+    /* 評分結果樣式 */
+    .question-card.correct {
+        border: 2px solid #198754;
+    }
 
-        .result-correct-badge {
-            color: #198754;
-            font-weight: bold;
-            margin-left: 10px;
-        }
+    .question-card.incorrect {
+        border: 2px solid #dc3545;
+    }
 
-        .result-incorrect-badge {
-            color: #dc3545;
-            font-weight: bold;
-            margin-left: 10px;
-        }
+    .result-footer {
+        background-color: #f8f9fa;
+        border-top: 1px dashed #ced4da;
+        padding: 10px 15px;
+    }
 
-        /* 模式選擇樣式 */
-        .mode-selection-card {
-            max-width: 600px;
-            width: 100%;
-            margin: auto;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            min-height: 50vh;
-        }
+    .result-correct-badge {
+        color: #198754;
+        font-weight: bold;
+        margin-left: 10px;
+    }
 
-        .btn-mode {
-            padding: 20px 30px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            border-radius: 10px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            text-align: left;
-        }
+    .result-incorrect-badge {
+        color: #dc3545;
+        font-weight: bold;
+        margin-left: 10px;
+    }
+
+    /* 模式選擇樣式 */
+    .mode-selection-card {
+        max-width: 600px;
+        width: 100%;
+        margin: auto;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        min-height: 50vh;
+    }
+
+    .btn-mode {
+        padding: 20px 30px;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border-radius: 10px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-align: left;
+    }
 
         .btn-mode:hover {
             transform: translateY(-3px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
         }
-    </style>
-</head>
-<body>
+
+    /* 新增：測驗介面佈局 */
+    .quiz-container {
+        display: flex;
+        gap: 30px; /* 題目與導覽之間的間距 */
+    }
+
+    .quiz-main-content {
+        flex-grow: 1; /* 佔據剩餘空間 */
+        max-width: 800px; /* 限制題目區最大寬度 */
+    }
+
+    /* 新增：題目導覽列樣式 */
+    #question-navigator-wrap {
+        width: 250px;
+        flex-shrink: 0; /* 不讓它縮小 */
+        position: sticky; /* 粘性定位 */
+        top: 20px; /* 距離頂部 */
+        align-self: flex-start; /* 對齊容器的頂部 */
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+    }
+
+    #question-navigator .nav-item {
+        display: inline-block;
+        margin: 5px;
+    }
+
+    .nav-link-q {
+        display: block;
+        width: 40px;
+        height: 40px;
+        line-height: 40px;
+        text-align: center;
+        border-radius: 8px;
+        background-color: #e9ecef; /* 預設未作答 */
+        color: #495057;
+        font-weight: 500;
+        transition: background-color 0.2s, transform 0.1s;
+        text-decoration: none;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+        .nav-link-q:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-link-q.answered {
+            background-color: #198754; /* 已作答 */
+            color: white;
+            box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
+        }
+
+        .nav-link-q.incorrect-result {
+            background-color: #dc3545; /* 結果錯誤 */
+            color: white;
+        }
+
+        .nav-link-q.correct-result {
+            background-color: #198754; /* 結果正確 */
+            color: white;
+        }
+</style>
+
     <div id="custom-alert" class="alert alert-warning shadow-lg" role="alert">
         <strong>注意！</strong> 您還有未作答的題目。
     </div>
@@ -92,19 +151,15 @@
 
         {% if mode == 'selection' %}
 
-        <!-- 模式選擇畫面 -->
         <div class="mode-selection-card bg-white p-5 d-flex flex-column justify-content-center">
             <h1 class="text-center text-3xl font-weight-bold text-dark mb-4">🩺 測驗模式選擇</h1>
             <p class="text-center text-secondary mb-5">請選擇您要開始的練習模式。</p>
 
             {% if error_message %}
-            <!-- 如果沒有收藏題可練，後端會傳回此錯誤訊息 -->
             <div class="alert alert-danger text-center">{{ error_message }}</div>
             {% endif %}
 
             <div class="d-grid gap-4">
-                <!-- 模式 1: 隨機出題 (正常模式) -->
-                <!-- 連結到 /quiz_page?mode=normal -->
                 <a href="{{ url_for('quiz', mode='normal') }}" class="btn btn-mode btn-primary text-white">
                     <div class="d-flex align-items-center">
                         <span class="fs-1 me-4">🎲</span>
@@ -115,8 +170,6 @@
                     </div>
                 </a>
 
-                <!-- 模式 2: 錯題重練 -->
-                <!-- 連結到 /quiz_page?mode=practice -->
                 <a href="{{ url_for('quiz', mode='practice') }}" class="btn btn-mode btn-warning">
                     <div class="d-flex align-items-center">
                         <span class="fs-1 me-4">🔁</span>
@@ -131,10 +184,8 @@
 
         {% else %}
 
-        <!-- 測驗進行畫面 -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1 class="text-center mb-0">{{ title }}</h1>
-            <!-- 返回模式選擇按鈕 -->
             <a href="{{ url_for('quiz', mode='selection') }}" class="btn btn-secondary btn-sm shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8" />
@@ -145,173 +196,297 @@
 
         <p class="text-center text-muted">選擇題 <strong>{{ quiz_data | length }}</strong> 題，請選擇一個最正確的答案。</p>
 
-        <!-- 測驗表單開始 -->
-        <form id="quiz-form">
-            {% for question in quiz_data %}
-
-            {% set q_index = loop.index %}
-
-            <div class="card shadow-sm mb-4 question-card" data-question-index="{{ q_index }}">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">第 {{ q_index }} 題</h5>
+        <div class="quiz-container">
+            <div id="question-navigator-wrap" class="card shadow-sm p-3">
+                <h5 class="card-title text-center mb-3">題目概覽</h5>
+                <div id="question-navigator" class="text-center">
                 </div>
-                <div class="card-body">
-                    <!-- 顯示題目 -->
-                    <p class="card-text fw-bold">{{ question.題目 }}</p>
+            </div>
 
-                    <!-- 顯示選項 -->
-                    {% for option in question.選項 %}
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio"
-                               name="question-{{ q_index }}"
-                               id="q{{ q_index }}-o{{ loop.index }}"
-                               value="{{ option }}">
-                        <label class="form-check-label" for="q{{ q_index }}-o{{ loop.index }}">
-                            {{ option }}
-                        </label>
+            <div class="quiz-main-content">
+                <form id="quiz-form">
+                    {% for question in quiz_data %}
+
+                    {% set q_index = loop.index %}
+
+                    <div class="card shadow-sm mb-4 question-card" data-question-index="{{ q_index }}" id="q-{{ q_index }}">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">第 {{ q_index }} 題</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text fw-bold">{{ question.題目 }}</p>
+
+                            {% for option in question.選項 %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio"
+                                       name="question-{{ q_index }}"
+                                       id="q{{ q_index }}-o{{ loop.index }}"
+                                       value="{{ option }}"
+                                       data-q-index="{{ q_index }}">
+                                <label class="form-check-label" for="q{{ q_index }}-o{{ loop.index }}">
+                                    {{ option }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="card-footer result-footer d-none"></div>
                     </div>
                     {% endfor %}
+
+                    <div id="submit-area" class="text-center mt-5 mb-5">
+                        <button type="submit" class="btn btn-success btn-lg px-5">送出測驗</button>
+                    </div>
+                </form>
+                <div id="result-summary" class="card shadow-lg mb-5 d-none">
+                    <div class="card-body text-center">
+                        <h2 class="card-title text-primary">測驗結果</h2>
+                        <p class="h3 mb-0">總分：<strong id="final-score" class="text-success"></strong> / <span id="max-score"></span></p>
+                        <p class="lead mt-2">答對：<strong id="correct-count-summary" class="text-success"></strong> 題 / 答錯：<strong id="incorrect-count-summary" class="text-danger"></strong> 題</p>
+                        <a id="view-report-btn" class="btn btn-primary mt-3 px-4">查看詳細報告</a>
+                    </div>
                 </div>
-                <!-- 預留給結果詳情 -->
-                <div class="card-footer result-footer d-none"></div>
             </div>
-            {% endfor %}
-
-            <div id="submit-area" class="text-center mt-5">
-                <button type="submit" class="btn btn-success btn-lg px-5">送出測驗</button>
-            </div>
-        </form>
-        <!-- 測驗表單結束 -->
-        <!-- 評分結果區塊 (預設隱藏) -->
-        <div id="result-summary" class="card shadow-lg mb-5 d-none">
-            <div class="card-body text-center">
-                <h2 class="card-title text-primary">測驗結果</h2>
-                <p class="h3 mb-0">總分：<strong id="final-score" class="text-success"></strong> / <span id="max-score"></span></p>
-                <p class="lead mt-2">答對：<strong id="correct-count-summary" class="text-success"></strong> 題 / 答錯：<strong id="incorrect-count-summary" class="text-danger"></strong> 題</p>
-                <!-- 導向報告頁面的按鈕 -->
-                <a id="view-report-btn" class="btn btn-primary mt-3 px-4">查看詳細報告</a>
-            </div>
-        </div>
-
-        {% endif %}
+        </div>{% endif %}
 
     </div>
 
     <script>
-        // 只有在測驗模式下才執行 JavaScript 邏輯
-        if (document.getElementById('quiz-form')) {
-            // 將 Jinja 變數安全地傳遞給 JavaScript
-            const quizData = {{ quiz_data | tojson | safe }};
-            const form = document.getElementById('quiz-form');
-            const submitArea = document.getElementById('submit-area');
-            const resultSummary = document.getElementById('result-summary');
-            const customAlert = document.getElementById('custom-alert');
+    // 只有在測驗模式下才執行 JavaScript 邏輯
+    if (document.getElementById('quiz-form')) {
+        // 將 Jinja 變數安全地傳遞給 JavaScript
+        const quizData = {{ quiz_data | tojson | safe }};
+        const form = document.getElementById('quiz-form');
+        const submitArea = document.getElementById('submit-area');
+        const resultSummary = document.getElementById('result-summary');
+        const customAlert = document.getElementById('custom-alert');
+        const totalQuestions = quizData.length;
+        const navigatorDiv = document.getElementById('question-navigator');
 
-            // 顯示自訂警告訊息
-            function showAlert(message) {
-                customAlert.innerHTML = `<strong>注意！</strong> ${message}`;
-                customAlert.style.display = 'block';
-                setTimeout(() => {
-                    customAlert.style.display = 'none';
-                }, 3000);
-            }
+        // 顯示自訂警告訊息
+        function showAlert(message) {
+            customAlert.innerHTML = `<strong>注意！</strong> ${message}`;
+            customAlert.style.display = 'block';
+            setTimeout(() => {
+                customAlert.style.display = 'none';
+            }, 3000);
+        }
 
-            // 處理表單提交
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-
-                // 1. 收集使用者答案
-                const userAnswers = {};
-                quizData.forEach((_, index) => {
-                    const questionIndex = index + 1;
-                    const radios = document.getElementsByName(`question-${questionIndex}`);
-                    for (const radio of radios) {
-                        if (radio.checked) {
-                            userAnswers[`question-${questionIndex}`] = radio.value;
-                            break;
-                        }
+        // --- 導覽列相關函式 ---
+        function generateNavigator() {
+            for (let i = 1; i <= totalQuestions; i++) {
+                const navItem = document.createElement('div');
+                navItem.classList.add('nav-item');
+                const navLink = document.createElement('a');
+                navLink.classList.add('nav-link-q');
+                navLink.textContent = i;
+                navLink.id = `nav-q-${i}`;
+                navLink.setAttribute('data-q-index', i);
+                navLink.addEventListener('click', function() {
+                    const targetId = `q-${i}`;
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        this.style.transform = 'scale(1.1)';
+                        setTimeout(() => this.style.transform = 'scale(1)', 200);
                     }
                 });
+                navItem.appendChild(navLink);
+                navigatorDiv.appendChild(navItem);
+            }
+        }
 
-                // 檢查是否有未答題目
-                const totalQuestions = quizData.length;
-                const answeredQuestions = Object.keys(userAnswers).length;
-
-                if (answeredQuestions < totalQuestions) {
-                    showAlert(`您還有 ${totalQuestions - answeredQuestions} 題未作答。`);
-                    return; // 不強制送出
-                }
-
-                // 禁用按鈕防止重複提交
-                const submitButton = form.querySelector('button[type="submit"]');
-                submitButton.disabled = true;
-                submitButton.textContent = '評分中...';
-
-                // 2. 發送答案和原始題目資料到後端
-                try {
-                    const response = await fetch('/submit_quiz', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            answers: userAnswers,
-                            quiz_data: quizData
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({ message: '未知錯誤' }));
-                        throw new Error(`評分處理失敗: ${errorData.message}`);
-                    }
-
-                    const result = await response.json();
-
-                    // 3. 顯示評分結果總結並導向報告
-                    displayResults(result);
-
-                    document.getElementById('view-report-btn').onclick = function() {
-                        window.location.href = '/report_page';
-                    };
-
-                } catch (error) {
-                    console.error('評分失敗:', error);
-                    showAlert('評分時發生錯誤，請稍後再試。錯誤細節：' + error.message);
-                    // 恢復按鈕
-                    submitButton.disabled = false;
-                    submitButton.textContent = '送出測驗';
-                }
-            });
-
-            // 顯示評分結果的函式 (此處僅用於展示總結)
-            function displayResults(result) {
-
-                // 隱藏表單
-                form.classList.add('d-none');
-
-                // 顯示總結
-                if (document.getElementById('final-score')) {
-                    document.getElementById('final-score').textContent = result.total_score;
-                }
-                if (document.getElementById('max-score')) {
-                    document.getElementById('max-score').textContent = result.total_questions * result.score_per_question;
-                }
-                if (document.getElementById('correct-count-summary')) {
-                    document.getElementById('correct-count-summary').textContent = result.correct_count;
-                }
-                if (document.getElementById('incorrect-count-summary')) {
-                    document.getElementById('incorrect-count-summary').textContent = result.total_questions - result.correct_count;
-                }
-
-                // 隱藏提交區，顯示總結區
-                if (submitArea) {
-                    submitArea.classList.add('d-none');
-                }
-                if (resultSummary) {
-                    resultSummary.classList.remove('d-none');
+        function updateNavigator(questionIndex, isAnswered, isResultMode = false, isCorrect = false) {
+            const navLink = document.getElementById(`nav-q-${questionIndex}`);
+            if (navLink) {
+                navLink.classList.remove('answered', 'correct-result', 'incorrect-result');
+                if (isResultMode) {
+                    navLink.classList.add(isCorrect ? 'correct-result' : 'incorrect-result');
+                } else if (isAnswered) {
+                    navLink.classList.add('answered');
                 }
             }
         }
+
+        function setupAnswerListener() {
+            const radioInputs = form.querySelectorAll('input[type="radio"]');
+            radioInputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    const qIndex = this.getAttribute('data-q-index');
+                    updateNavigator(qIndex, true);
+                });
+                if (input.checked) {
+                    const qIndex = input.getAttribute('data-q-index');
+                    updateNavigator(qIndex, true);
+                }
+            });
+        }
+        // --- 導覽列相關函式 END ---
+
+
+        // 顯示評分結果的函式
+        function displayResults(result) {
+            // 1. 更新結果總結區塊
+            document.getElementById('final-score').textContent = result.total_score;
+            document.getElementById('max-score').textContent = result.total_questions * result.score_per_question;
+            document.getElementById('correct-count-summary').textContent = result.correct_count;
+            document.getElementById('incorrect-count-summary').textContent = result.total_questions - result.correct_count;
+
+            // 隱藏提交區
+            if (submitArea) {
+                // 從 'hidden' 改回 'd-none'
+                submitArea.classList.add('d-none');
+            }
+            // 顯示結果總結區
+            if (resultSummary) {
+                // 從 'hidden' 改回 'd-none'
+                resultSummary.classList.remove('d-none');
+            }
+
+            // 2. 標記每一題的結果和正確答案
+            if (result.detailed_results) {
+                result.detailed_results.forEach(item => {
+                    const qIndex = item.question_index;
+                    const isCorrect = item.is_correct;
+                    const correctOption = item.correct_answer;
+
+                    const questionCard = document.getElementById(`q-${qIndex}`);
+                    if (!questionCard) return;
+
+                    const resultFooter = questionCard.querySelector('.result-footer');
+
+                    // 標記題卡顏色
+                    questionCard.classList.add(isCorrect ? 'correct' : 'incorrect');
+
+                    // 標記選項顏色並禁用選項
+                    const radioInputs = questionCard.querySelectorAll('input[type="radio"]');
+                    radioInputs.forEach(radio => {
+                        radio.disabled = true; // 禁用所有選項
+                        const label = radio.nextElementSibling;
+                        let badgeHtml = '';
+
+                        if (radio.value === correctOption) {
+                            // 正確答案
+                            badgeHtml = '<span class="badge bg-success ms-2 result-correct-badge">✅ 正確答案</span>';
+                        } else if (radio.checked && !isCorrect) {
+                            // 使用者選錯的答案
+                            badgeHtml = '<span class="badge bg-danger ms-2 result-incorrect-badge">❌ 你的答案</span>';
+                        }
+
+                        // 移除舊的標記並加入新的
+                        const existingBadge = label.querySelector('.badge');
+                        if (existingBadge) existingBadge.remove();
+
+                        // 使用 insertAdjacentHTML 插入徽章
+                        if (badgeHtml) {
+                            label.insertAdjacentHTML('beforeend', badgeHtml);
+                        }
+                    });
+
+                    // 顯示結果詳情區
+                    const summaryHtml = `
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
+                            <div>
+                                <strong>評分結果：</strong>
+                                <span class="${isCorrect ? 'result-correct-badge' : 'result-incorrect-badge'}">
+                                    ${isCorrect ? '✔ 答對' : '✖ 答錯'}
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-700">
+                                <strong>標準答案：</strong> <span class="font-bold text-green-700">${correctOption}</span>
+                            </div>
+                        </div>
+                    `;
+                    // 確保 footer 顯示
+                    resultFooter.innerHTML = summaryHtml;
+                    // 從 'hidden' 改回 'd-none'
+                    resultFooter.classList.remove('d-none');
+
+                    // 更新導覽列狀態
+                    updateNavigator(qIndex, true, true, isCorrect);
+                });
+            }
+        }
+
+
+        // 處理表單提交 - 強化錯誤處理
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            // 1. 收集使用者答案 (邏輯不變)
+            const userAnswers = {};
+            const answeredQuestions = new Set();
+            quizData.forEach((_, index) => {
+                const questionIndex = index + 1;
+                const radios = document.getElementsByName(`question-${questionIndex}`);
+                for (const radio of radios) {
+                    if (radio.checked) {
+                        userAnswers[`question-${questionIndex}`] = radio.value;
+                        answeredQuestions.add(questionIndex);
+                        break;
+                    }
+                }
+            });
+
+            const answeredCount = answeredQuestions.size;
+            if (answeredCount < totalQuestions) {
+                showAlert(`您還有 ${totalQuestions - answeredCount} 題未作答。`);
+                return;
+            }
+
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = '評分中...';
+
+            // 2. 發送答案並處理響應 (強化修正區)
+            try {
+                const response = await fetch('/submit_quiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answers: userAnswers, quiz_data: quizData })
+                });
+
+                // 嘗試讀取 JSON 響應體，即使狀態碼不是 200
+                let responseBody;
+                try {
+                    responseBody = await response.json();
+                } catch (e) {
+                    console.error("JSON Parsing Error:", e);
+                    // 如果無法解析為 JSON，很可能是伺服器返回了 HTML 錯誤頁面
+                    throw new Error(`伺服器返回非 JSON 格式響應。狀態碼: ${response.status}。`);
+                }
+
+                if (!response.ok) {
+                    // 如果狀態碼不是 200-299，從解析的 body 中獲取錯誤訊息
+                    const errorMessage = responseBody.message || responseBody.error || '未知伺服器錯誤';
+                    throw new Error(`評分處理失敗 (${response.status}): ${errorMessage}`);
+                }
+
+                // 3. 成功處理
+                displayResults(responseBody);
+
+                // 設定查看報告按鈕點擊事件
+                document.getElementById('view-report-btn').onclick = function() {
+                    window.location.href = '/report_page';
+                };
+
+            } catch (error) {
+                // 4. 錯誤處理
+                console.error('評分失敗:', error);
+                showAlert('評分時發生錯誤，請稍後再試。錯誤細節：' + error.message);
+                // 恢復按鈕
+                submitButton.disabled = false;
+                submitButton.textContent = '送出測驗並評分';
+            }
+        });
+
+        // 頁面載入時執行
+        document.addEventListener('DOMContentLoaded', () => {
+            if (totalQuestions > 0) {
+                generateNavigator();
+                setupAnswerListener();
+            }
+        });
+    }
     </script>
-</body>
-</html>
+
+    {% endblock %}

@@ -1,49 +1,14 @@
-﻿'''import os
-from mistralai import Mistral
-
-api_key = os.environ["MISTRAL_API_KEY"]
-model = "magistral-small-latest"
-client = Mistral(api_key=api_key)
-
-# Define the messages for the chat
-messages = [
-    {
-        "role": "user",
-        "content": [
-            {
-                "type": "text",
-                "text": "What's in this image?"
-            },
-            {
-                "type": "image_url",
-                "image_url": "https://i.epochtimes.com/assets/uploads/2019/04/shutterstock_295189109.jpg"
-            }
-        ]
-    }
-]
-
-# Get the chat response
-chat_response = client.chat.complete(
-    model=model,
-    messages=messages
-)
-
-# Print the content of the response
-print(chat_response.choices[0].message.content)
-'''
-
-import os
+﻿import os
 import sys
 import csv
+import json # 新增 json 模組以解析 AI 輸出的結構化數據
 from mistralai import Mistral # 確保您已安裝 'mistralai' 庫
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 from collections import defaultdict
 
 # --- 配置區塊 ---
-# 假設您的 ingredient_metadata 檔案使用逗號分隔
 INGREDIENT_CSV_DELIMITER = ',' 
-DEFAULT_INGREDIENT_MASS_G = 100.0 # 關鍵假設：如果 AI 只辨識出名稱，我們假設每個食材都是 100 克
-MISTRAL_MODEL = "mistral-small-latest" # 選擇支持多模態輸入的 Mistral 模型
+MISTRAL_MODEL = "mistral-small-latest" 
 
 # --- 營養素欄位定義 (與輸出 CSV 格式一致) ---
 DATA_FIELDNAMES = ["dish_id", "calories", "mass", "fat", "carb", "protein"]
@@ -52,6 +17,49 @@ DATA_FIELDNAMES = ["dish_id", "calories", "mass", "fat", "carb", "protein"]
 # { "ingredient_name": {"cal/g": 0.98, "fat(g)": 0.043, ...} }
 NutrientData = Dict[str, float]
 IngredientDB = Dict[str, NutrientData]
+# AI 輸出的結構化數據類型
+EstimatedFood = Dict[str, Any] 
+
+
+def SimpleSingularize(word: str) -> str:
+    """
+    增強版：嘗試將一個單詞轉換為其單數形式。
+    專門處理常見的食物單複數變化，以提高與數據庫的匹配成功率。
+    """
+    word = word.lower().strip()
+    
+    # 處理特殊或不規則名詞 (在食物中常見)
+    irregular_map = {
+        'rice': 'rice', 
+        'fish': 'fish',
+        'sushi': 'sushi', 
+        'potatoes': 'potato',
+        'tomatoes': 'tomato',
+        'berries': 'berry',
+        'cookies': 'cookie',
+        'fries': 'fry', # 例如: french fries -> french fry
+        'peppers': 'pepper'
+    }
+    
+    if word in irregular_map:
+        return irregular_map[word]
+    
+    # 處理 '-ies' 結尾: e.g., 'strawberries' -> 'strawberry'
+    if word.endswith('ies'):
+        return word[:-3] + 'y'
+    
+    # 處理 '-es' 結尾: e.g., 'bunches' -> 'bunch'
+    if word.endswith('es') and len(word) > 3:
+        # 排除像 'cheese' 這種單數本身就以 'es' 結尾的單詞
+        if word[:-2] not in irregular_map: 
+             return word[:-2]
+    
+    # 處理大部分 '-s' 結尾: e.g., 'apples' -> 'apple'
+    # 排除單數名詞如 'cheese' 或以 'ss' 結尾的名詞
+    if word.endswith('s') and len(word) > 2 and not word.endswith(('ss', 'us', 'is')):
+        return word[:-1]
+    
+    return word
 
 
 def ReadIngredientMetadata(filepath: str) -> IngredientDB:
@@ -62,7 +70,6 @@ def ReadIngredientMetadata(filepath: str) -> IngredientDB:
     
     ingredient_db: IngredientDB = {}
     
-    # 預期的 CSV 標頭：ingr, id, cal/g, fat(g), carb(g), protein(g)
     expected_headers = ["ingr", "id", "cal/g", "fat(g)", "carb(g)", "protein(g)"]
     
     with open(filepath, "r", newline='', encoding='utf-8-sig') as f_in:
@@ -70,11 +77,9 @@ def ReadIngredientMetadata(filepath: str) -> IngredientDB:
         
         try:
             headers = next(reader)
-            # 檢查標頭是否匹配 (跳過 id 欄位)
             if not all(h in headers for h in expected_headers):
                  print(f"警告: 標頭不符合預期: {headers}")
             
-            # 找到關鍵營養素的索引
             ingr_idx = headers.index("ingr")
             cal_idx = headers.index("cal/g")
             fat_idx = headers.index("fat(g)")
@@ -99,7 +104,7 @@ def ReadIngredientMetadata(filepath: str) -> IngredientDB:
                     "fat": float(row[fat_idx]),
                     "carb": float(row[carb_idx]),
                     "protein": float(row[protein_idx]),
-                    "mass": 1.0 # 假設 mass_per_mass 單位為 1
+                    "mass": 1.0 
                 }
             except (IndexError, ValueError) as e:
                 print(f"警告: 處理食材數據時出錯，跳過該行: {row} ({e})")
@@ -108,17 +113,27 @@ def ReadIngredientMetadata(filepath: str) -> IngredientDB:
     return ingredient_db
 
 
-def GetIdentifiedIngredients(image_url: str, api_key: str) -> List[str]:
-    """呼叫 Mistral API 進行圖像辨識，並返回食材列表。"""
-    print(f"正在呼叫 Mistral 模型 ({MISTRAL_MODEL}) 辨識圖片: {image_url}...")
+def GetIdentifiedIngredients(image_url: str, api_key: str, valid_ingredients: List[str]) -> List[EstimatedFood]:
+    """呼叫 Mistral API 進行圖像辨識，並返回包含食材名稱和估算質量的列表。"""
+    print(f"正在呼叫 Mistral 模型 ({MISTRAL_MODEL}) 辨識圖片和估算重量: {image_url}...")
     
     client = Mistral(api_key=api_key)
     
-    # 優化提示詞，明確要求模型只輸出逗號分隔的食物列表
+    # 將所有有效食材名稱合併成一個易讀的字串，用於提示詞
+    ingredient_list_str = ", ".join(sorted(valid_ingredients))
+    
+    # 增強的系統提示詞，明確指示模型參考列表並以 JSON 格式輸出名稱和估算質量 (mass_g)
     system_prompt = (
-        "You are an expert food identification AI. Identify all distinct food ingredients "
-        "in the image and list them. List only the common name of the food, separated by commas. "
-        "DO NOT include any explanation or extra text. Only the comma-separated list."
+        "You are an expert food identification and serving estimation AI. "
+        "Your task is to identify as many different food ingredients as possible in the image and estimate the mass (in grams) "
+        "of a typical serving of each item based on common knowledge (e.g., one whole apple is 182g, "
+        "one banana is 118g, a standard slice of bread is 28g). "
+        "Your priority is to match the ingredient name to the following list: "
+        f"[{ingredient_list_str}]. Please prioritize singular and plural forms from the list. "
+        "If a food is not in the list, use the closest common name. "
+        "You MUST respond ONLY with a single JSON array of objects. "
+        "Each object MUST have two keys: 'name' (string, the food name) and 'mass_g' (float, the estimated mass in grams). "
+        "DO NOT include any extra text, explanation, or markdown formatting outside the JSON array."
     )
 
     messages = [
@@ -126,7 +141,7 @@ def GetIdentifiedIngredients(image_url: str, api_key: str) -> List[str]:
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": "Please identify the ingredients in this image:"},
+                {"type": "text", "text": "Please identify the ingredients and estimate their typical mass in grams for this image:"},
                 {"type": "image_url", "image_url": image_url}
             ]
         }
@@ -137,38 +152,86 @@ def GetIdentifiedIngredients(image_url: str, api_key: str) -> List[str]:
             model=MISTRAL_MODEL,
             messages=messages
         )
-        raw_output = chat_response.choices[0].message.content.lower().strip()
         
-        # 解析輸出: 將逗號分隔的字串轉換為列表
-        identified_foods = [food.strip() for food in raw_output.split(',') if food.strip()]
-        return identified_foods
+        raw_output_content = chat_response.choices[0].message.content
+        
+        # 嘗試清理任何可能的 markdown 標記 (```json) 或不必要的文字
+        if isinstance(raw_output_content, str):
+            if raw_output_content.startswith("```json"):
+                raw_output_content = raw_output_content.replace("```json", "").replace("```", "").strip()
+        
+        identified_foods_with_mass = []
+        try:
+            # 解析 JSON 陣列 [{"name": "...", "mass_g": 0.0}, ...]
+            parsed_foods = json.loads(raw_output_content)
+        except json.JSONDecodeError as e:
+            print(f"錯誤: 無法解析 Mistral API 輸出的 JSON 格式: {e}")
+            print(f"原始輸出: {raw_output_content[:200]}...")
+            return []
+
+        # 驗證結構並標準化
+        for item in parsed_foods:
+            if isinstance(item, dict) and 'name' in item and 'mass_g' in item:
+                # Standardize name and ensure mass is a float
+                name = str(item['name']).strip().lower()
+                mass = float(item['mass_g']) if item['mass_g'] is not None else 0.0
+                if name and mass > 0:
+                    identified_foods_with_mass.append({"name": name, "mass_g": mass})
+                
+        return identified_foods_with_mass
         
     except Exception as e:
         print(f"Mistral API 呼叫失敗: {e}")
         return []
 
 
-def CalculateNutrition(identified_foods: List[str], ingredient_db: IngredientDB) -> Tuple[Dict[str, float], List[str]]:
-    """計算匹配成功的食材的總營養素。"""
+def CalculateNutrition(identified_foods_with_mass: List[EstimatedFood], ingredient_db: IngredientDB) -> Tuple[Dict[str, float], List[str]]:
+    """計算匹配成功的食材的總營養素，並使用 AI 估算的質量進行計算。
+    
+    此函數已強化匹配邏輯：先嘗試直接匹配，失敗後再嘗試單數形式。
+    """
     total_nutrition = defaultdict(float)
     matched_ingredients = []
     
     print("\n--- 營養素計算步驟 ---")
     
-    for food in identified_foods:
-        # 進行比對與篩選
-        if food in ingredient_db:
-            matched_ingredients.append(food)
-            nutrients_per_g = ingredient_db[food]
+    for item in identified_foods_with_mass:
+        food = item.get('name', '')
+        estimated_mass = item.get('mass_g', 0.0)
+        
+        if not food or estimated_mass <= 0:
+             print(f"  [跳過] 食材: {food.capitalize()} (質量無效: {estimated_mass:.1f}g)")
+             continue
+             
+        normalized_food = food.strip().lower() 
+        match_name = None 
+        
+        # 1. 嘗試直接匹配 AI 輸出 (例如：如果 AI 輸出 'apples' 且 DB 也有 'apples')
+        if normalized_food in ingredient_db:
+            match_name = normalized_food
             
-            # 執行營養素計算 (假設每個食材都是 100g)
-            total_nutrition['calories'] += nutrients_per_g['calories'] * DEFAULT_INGREDIENT_MASS_G
-            total_nutrition['fat'] += nutrients_per_g['fat'] * DEFAULT_INGREDIENT_MASS_G
-            total_nutrition['carb'] += nutrients_per_g['carb'] * DEFAULT_INGREDIENT_MASS_G
-            total_nutrition['protein'] += nutrients_per_g['protein'] * DEFAULT_INGREDIENT_MASS_G
-            total_nutrition['mass'] += DEFAULT_INGREDIENT_MASS_G # 總質量也累加
+        # 2. 如果原始形式未匹配，則嘗試將 AI 輸出轉換為單數形式 (例如：AI 輸出 'apples', DB 只有 'apple')
+        if match_name is None:
+            singular_food = SimpleSingularize(normalized_food)
             
-            print(f"  [匹配成功] 食材: {food.capitalize()} (假設 {DEFAULT_INGREDIENT_MASS_G:.1f}g)")
+            # 只有在單數形式與原始形式不同時才進行檢查，避免重複
+            if singular_food != normalized_food and singular_food in ingredient_db:
+                match_name = singular_food
+        
+        # 3. 執行計算
+        if match_name:
+            # 記錄匹配到的數據庫名稱
+            matched_ingredients.append(match_name)
+            nutrients_per_g = ingredient_db[match_name]
+            
+            # 執行營養素計算 (使用 AI 估算的質量)
+            total_nutrition['calories'] += nutrients_per_g['calories'] * estimated_mass
+            total_nutrition['fat'] += nutrients_per_g['fat'] * estimated_mass
+            total_nutrition['carb'] += nutrients_per_g['carb'] * estimated_mass
+            total_nutrition['protein'] += nutrients_per_g['protein'] * estimated_mass
+            total_nutrition['mass'] += estimated_mass # 總質量也累加
+            
+            print(f"  [匹配成功] 食材: {food.capitalize()} (數據庫名稱: {match_name.capitalize()}, 估算 {estimated_mass:.1f}g)")
         else:
             print(f"  [未匹配] 食材: {food.capitalize()} (不在 Nutrition5k 清單中)")
             
@@ -187,7 +250,7 @@ def WritePredictionCSV(dish_id: str, nutrition_data: Dict[str, float], output_pa
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     try:
-        with open(output_path, 'w', newline='', encoding='utf-8-sig') as f_out:
+        with open(output_path, 'w', newline='', encoding='utf-8') as f_out:
             writer = csv.writer(f_out, delimiter=',')
             
             # 寫入標頭行
@@ -223,20 +286,16 @@ def main():
 
     # --- START: 硬編碼參數設定區塊 (請直接修改這裡的值) ---
     
-    # 1. 設置要處理的菜餚 ID (任意唯一字串)
     dish_id = "dish_20251002"
+    # 圖片 URL
+    image_url = "https://raw.githubusercontent.com/google-research-datasets/Nutrition5k/refs/heads/main/res/example_plate.jpg"
     
-    # 2. 設置要分析的圖片 URL (這是您提供的範例圖片)
-    image_url = "https://tokyo-kitchen.icook.network/uploads/recipe/cover/372355/445748b0bf0f2991.jpg"
-    
-    # 3. 設置輸出 CSV 文件的路徑 (將存放在腳本目錄下的 output_predictions 資料夾)
     output_csv_path = os.path.join(
         os.path.dirname(__file__), 
         'information', 
         f'{dish_id}_prediction.csv'
     )
     
-    # 4. 設定食材 CSV 路徑為腳本目錄下的 'information/ingredient_metadata.csv' (此路徑已固定)
     ingredient_csv_path = os.path.join(
         os.path.dirname(__file__), 
         'information', 
@@ -245,7 +304,7 @@ def main():
     
     # --- END: 硬編碼參數設定區塊 ---
     
-    # 1. 載入食材數據庫
+    # 1. 載入食材數據庫並提取名稱列表
     ingredient_db = ReadIngredientMetadata(ingredient_csv_path)
     if not ingredient_db:
         print("無法載入食材數據庫，程式終止。")
@@ -253,17 +312,23 @@ def main():
         
     print(f"成功載入 {len(ingredient_db)} 種食材數據。")
     
-    # 2. 圖像辨識
-    identified_foods = GetIdentifiedIngredients(image_url, api_key)
+    # 獲取所有有效的食材名稱，用於提示詞
+    valid_ingredient_names = list(ingredient_db.keys())
     
-    if not identified_foods:
-        print("AI 未能辨識出任何食材，或 API 呼叫失敗。")
+    # 2. 圖像辨識 (包含數據庫名稱參考和重量估算)
+    identified_foods_with_mass = GetIdentifiedIngredients(image_url, api_key, valid_ingredient_names)
+    
+    if not identified_foods_with_mass:
+        print("AI 未能辨識出任何食材或估算質量，或 API 呼叫失敗。")
         sys.exit(0)
     
-    print(f"\nAI 辨識出的原始食材: {identified_foods}")
+    # 輸出AI估算的清單，以更清晰的方式呈現
+    print(f"\nAI 辨識出的原始食材與估算質量:")
+    for item in identified_foods_with_mass:
+        print(f"  - 名稱: {item.get('name', 'N/A').capitalize()}, 質量: {item.get('mass_g', 0.0):.1f}g")
 
-    # 3. 營養素計算 (包含數據庫比對與篩選)
-    total_nutrition, matched_ingredients = CalculateNutrition(identified_foods, ingredient_db)
+    # 3. 營養素計算
+    total_nutrition, matched_ingredients = CalculateNutrition(identified_foods_with_mass, ingredient_db)
     
     if not matched_ingredients:
         print("沒有任何 AI 辨識出的食材與您的 Nutrition5k 清單匹配，無法計算營養素。")

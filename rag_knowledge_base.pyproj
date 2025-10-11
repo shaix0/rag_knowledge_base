@@ -31,10 +31,14 @@
     <Compile Include="rag_knowledge_base\clustering.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="rag_knowledge_base\mae.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="rag_knowledge_base\pdftojson.py" />
     <Compile Include="rag_knowledge_base\picture.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="rag_knowledge_base\quiz_manager.py" />
     <Compile Include="rag_knowledge_base\tag_helper.py">
       <SubType>Code</SubType>
     </Compile>
@@ -55,6 +59,7 @@
   <ItemGroup>
     <Content Include="rag_knowledge_base\information\醫學資訊管理師\2017年4月.pdf" />
     <Content Include="rag_knowledge_base\information\醫學資訊管理師\2025年4月.pdf" />
+    <Content Include="rag_knowledge_base\templates\ai.html" />
     <Content Include="rag_knowledge_base\templates\history_analysis.html" />
     <Content Include="rag_knowledge_base\templates\quiz_report.html" />
     <Content Include="requirements.txt" />

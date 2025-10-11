@@ -170,12 +170,22 @@
                     </div>
                 </a>
 
+                <a href="{{ url_for('quiz', mode='weakness') }}" class="btn btn-mode btn-danger text-white">
+                    <div class="d-flex align-items-center">
+                        <span class="fs-1 me-4">💪</span>
+                        <div>
+                            弱點加強模式
+                            <div class="text-sm fw-normal mt-1 opacity-75 text-white">針對您 **錯誤次數最多** 的題目進行重點練習。</div>
+                        </div>
+                    </div>
+                </a>
+
                 <a href="{{ url_for('quiz', mode='practice') }}" class="btn btn-mode btn-warning">
                     <div class="d-flex align-items-center">
                         <span class="fs-1 me-4">🔁</span>
                         <div>
                             錯題重練模式
-                            <div class="text-sm fw-normal mt-1 opacity-75 text-dark">僅包含您過去答錯或標記收藏的題目，加強弱點。</div>
+                            <div class="text-sm fw-normal mt-1 opacity-75 text-dark">僅包含您過去**答錯或標記收藏**的題目，鞏固學習。</div>
                         </div>
                     </div>
                 </a>

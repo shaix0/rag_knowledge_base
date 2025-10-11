@@ -8,7 +8,7 @@ from collections import defaultdict
 
 # --- 配置區塊 ---
 INGREDIENT_CSV_DELIMITER = ',' 
-MISTRAL_MODEL = "mistral-small-latest" 
+MISTRAL_MODEL = "mistral-large-latest" 
 
 # --- 營養素欄位定義 (與輸出 CSV 格式一致) ---
 DATA_FIELDNAMES = ["dish_id", "calories", "mass", "fat", "carb", "protein"]
@@ -131,6 +131,7 @@ def GetIdentifiedIngredients(image_url: str, api_key: str, valid_ingredients: Li
         "Your priority is to match the ingredient name to the following list: "
         f"[{ingredient_list_str}]. Please prioritize singular and plural forms from the list. "
         "If a food is not in the list, use the closest common name. "
+        "If the image is not food,  return can't identity ingrandient in the image, the image may not food"
         "You MUST respond ONLY with a single JSON array of objects. "
         "Each object MUST have two keys: 'name' (string, the food name) and 'mass_g' (float, the estimated mass in grams). "
         "DO NOT include any extra text, explanation, or markdown formatting outside the JSON array."
@@ -289,7 +290,8 @@ def main():
     dish_id = "dish_20251002"
     # 圖片 URL
     image_url = "https://raw.githubusercontent.com/google-research-datasets/Nutrition5k/refs/heads/main/res/example_plate.jpg"
-    
+    #image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Google_Chrome_icon_%28February_2022%29.svg/1200px-Google_Chrome_icon_%28February_2022%29.svg.png"
+
     output_csv_path = os.path.join(
         os.path.dirname(__file__), 
         'information', 
@@ -337,5 +339,7 @@ def main():
     # 4. 儲存結果
     WritePredictionCSV(dish_id, total_nutrition, output_csv_path)
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()
+
+main()

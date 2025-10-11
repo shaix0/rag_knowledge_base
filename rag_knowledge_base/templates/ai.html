@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>營養追蹤儀表板</title>
+    <link rel="stylesheet" href="test.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header class="top-navbar">
+        <div class="nav-menu">
+            <a href="dashboard.html" class="nav-item active">日誌</a>
+            <a href="#" class="nav-item">趨勢</a>
+            <a href="#" class="nav-item">食譜</a>
+        </div>
+
+        <div class="header-right">
+            <a href="ai_test_settings.html" title="設定"><div class="profile-pic nav-icon"></div></a>
+        </div>
+    </header>
+
+    <main class="dashboard full-width-layout">
+        <div class="content-wrapper">
+            <div class="card nutrition-report">
+                <div class="card-header">
+                    <span class="date">2025.09.30</span>
+                    <i class="fa-solid fa-calendar-day calendar-icon"></i>
+                </div>
+
+                <div class="chart-section">
+                    <div class="donut-chart-container">
+                        <div class="donut-chart"><div class="center-hole"></div></div>
+                        <span class="fat-percent">脂肪 5%</span>
+                    </div>
+
+                    <p class="recommendation">成人每日建議營養攝取量</p>
+                    <a href="settings.html" class="report-link">設定健康目標 查看完整報告 →</a>
+                </div>
+
+                <div class="progress-section">
+                    <div class="progress-item"><div class="progress-label">碳水</div><div class="progress-bar red-bar"></div></div>
+                    <div class="progress-item"><div class="progress-label">蛋白質</div><div class="progress-bar blue-bar"></div></div>
+                    <div class="progress-item"><div class="progress-label">脂肪</div><div class="progress-bar green-bar"></div></div>
+                    <div class="progress-item"><div class="progress-label">卡路里</div><div class="progress-bar orange-bar"></div></div>
+                </div>
+            </div>
+
+            <div class="card food-log-card">
+                <div class="food-entry">
+                    <p class="food-name-handwritten">薯條</p>
+                    <div class="food-details">
+                        <img src="未命名的作品.jpg" alt="薯條" class="food-image">
+                        <div class="info"><p>123 kcal</p><p class="notes">......</p></div>
+                    </div>
+                </div>
+
+                <div class="food-entry">
+                    <p class="food-name-handwritten">飯</p>
+                    <div class="food-details">
+                        <img src="未命名的作品.jpg" alt="飯" class="food-image">
+                        <div class="info"><p>123 kcal</p><p class="notes">......</p></div>
+                    </div>
+                </div>
+
+                <div id="actionMenu" class="action-menu-popup hidden">
+                    <button class="menu-item"><i class="fa-solid fa-image"></i> 照片圖庫</button>
+                    <button class="menu-item"><i class="fa-solid fa-camera"></i> 拍照</button>
+                    <button class="menu-item" id="test-img"><i class="fa-solid fa-magnifying-glass"></i> 選擇檔案</button>
+                </div>
+
+                <button id="addButton" class="add-button"><i class="fa-solid fa-plus"></i></button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.getElementById('addButton').addEventListener('click', function () {
+            document.getElementById('actionMenu').classList.toggle('hidden');
+        });
+
+        document.getElementById('test-img').onclick = function () {
+            window.location.href = '/test-img-mistralai';
+        };
+    </script>
+</body>
+</html>
+
+<style>
+    /* 設置所有元素的邊距、內邊距、盒模型和通用字體 */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        /* 模擬手寫風格，使用通用的無襯線字體 */
+        font-family: 'Segoe Print', 'Comic Sans MS', sans-serif;
+        color: #444;
+    }
+
+    body {
+        display: block;
+        background-color: var(--pale-yellow);
+        min-height: 100vh;
+    }
+
+    /* === 模擬手寫風格的 CSS 變數 === */
+    :root {
+        --card-bg-color: #ffffff;
+        --handwritten-ink: #333333;
+        --light-green: #cae8c0;
+        --light-yellow: #fffbf5;
+        --pale-yellow: #fdf8e9; /* 儀表板卡片背景色 */
+        --line-color: #a4b49c; /* 邊框/陰影顏色 */
+        --active-color: #5cb85c;
+        --red-progress: #d9534f;
+        --blue-progress: #428bca;
+        --green-progress: #5cb85c;
+        --orange-progress: #f0ad4e;
+    }
+
+    /* === 頂部導航列 (Top Navbar) === */
+    .top-navbar {
+        display: flex;
+        justify-content: flex-end; /* 將內容推到右側 */
+        align-items: center;
+        background-color: var(--light-green);
+        padding: 15px 40px;
+        height: 60px;
+    }
+
+    .nav-menu {
+        display: none; /* 隱藏菜單區域 */
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    /* 設定頁面專用的按鈕樣式 */
+    .home-icon,
+    .logout-icon {
+        font-size: 1.3rem;
+        color: #777;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+    .dot-indicator {
+        width: 12px;
+        height: 12px;
+        background-color: #ffffff;
+        border-radius: 50%;
+        border: 2px solid var(--line-color);
+    }
+
+    /* 模擬使用者頭像圖標 */
+    .nav-icon {
+        width: 35px;
+        height: 35px;
+        background-color: #e0e0e0;
+        border-radius: 50%;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23a1a1a1' d='M12 4a4 4 0 0 1 4 4a4 4 0 0 1-4 4a4 4 0 0 1-4-4a4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4'/%3E%3C/svg%3E");
+        background-size: 80%;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+
+        .nav-icon.active {
+            border: 2px solid var(--handwritten-ink);
+            padding: 1px;
+        }
+
+    /* === 主內容區 (Dashboard & Settings) === */
+    .dashboard {
+        padding: 20px 40px;
+        max-width: 100%;
+    }
+
+    .content-wrapper {
+        display: flex;
+        gap: 30px;
+        margin-top: 20px;
+    }
+
+    .card {
+        background-color: var(--light-yellow);
+        padding: 25px;
+        border-radius: 5px;
+        //box-shadow: 4px 4px 0 var(--line-color);
+        flex: 1;
+        min-height: 500px;
+        border: 2px solid var(--line-color);
+    }
+
+    /* --- 儀表板卡片樣式 --- */
+    .nutrition-report {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        font-weight: bold;
+    }
+
+    .calendar-icon {
+        color: var(--red-progress);
+        font-size: 1.5rem;
+    }
+
+    .chart-section {
+        text-align: center;
+        border-bottom: 1px solid #e0e0e0;
+        padding-bottom: 20px;
+        margin-bottom: 20px;
+    }
+
+    .recommendation {
+        font-size: 0.9rem;
+        color: #777;
+        margin-bottom: 5px;
+    }
+
+    .report-link {
+        font-size: 0.9rem;
+        color: #444;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .progress-section {
+        line-height: 2.5;
+    }
+
+    .progress-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+
+    .progress-label {
+        width: 60px;
+        text-align: right;
+        font-weight: bold;
+    }
+
+    /* 甜甜圈圖表模擬 */
+    .donut-chart-container {
+        position: relative;
+        width: 150px;
+        height: 150px;
+        margin: 0 auto 20px;
+    }
+
+    .donut-chart {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: conic-gradient(#428bca 0% 15%, #d9534f 15% 35%, #5cb85c 35% 45%, #e0e0e0 45% 100%);
+        position: relative;
+    }
+
+    .center-hole {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100px;
+        height: 100px;
+        background-color: var(--light-yellow);
+        border-radius: 50%;
+    }
+
+    .fat-percent {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 0.9rem;
+        font-weight: bold;
+    }
+
+    /* 進度條模擬 */
+    .progress-bar {
+        flex-grow: 1;
+        height: 10px;
+        background-color: #e0e0e0;
+        border-radius: 5px;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .progress-bar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            border-radius: 5px;
+        }
+
+    .red-bar::before {
+        background-color: var(--red-progress);
+        width: 80%;
+    }
+
+    .blue-bar::before {
+        background-color: var(--blue-progress);
+        width: 60%;
+    }
+
+    .green-bar::before {
+        background-color: var(--green-progress);
+        width: 90%;
+    }
+
+    .orange-bar::before {
+        background-color: var(--orange-progress);
+        width: 50%;
+    }
+
+    /* 食物日誌卡片 */
+    .food-log-card {
+        flex: 1.2;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .food-entry {
+        border-bottom: 1px dashed #d0d0d0;
+        padding-bottom: 10px;
+    }
+
+    .food-name-handwritten {
+        font-size: 1.5rem;
+        font-weight: 900;
+        margin-bottom: 5px;
+        line-height: 1;
+    }
+
+    .food-details {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+    }
+
+    .food-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 5px;
+    }
+
+    .info {
+        line-height: 1.3;
+    }
+
+    .notes {
+        color: #999;
+        font-style: italic;
+    }
+
+    /* 移除舊的底部佔位符 */
+    .empty-placeholder, .new-entry-area {
+        display: none;
+    }
+
+    /* === 加號按鈕樣式 (固定在右下角) === */
+    .add-button {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: var(--light-green);
+        color: #ffffff;
+        font-size: 1.5rem;
+        border: none;
+        cursor: pointer;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+        z-index: 11;
+    }
+
+    /* === 彈出選單樣式 === */
+    .action-menu-popup {
+        position: absolute;
+        bottom: 80px; /* 位於加號按鈕上方 */
+        right: 20px;
+        background-color: var(--card-bg-color);
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        z-index: 10;
+        min-width: 150px;
+    }
+
+        .action-menu-popup.hidden {
+            display: none; /* 預設隱藏 */
+        }
+
+        .action-menu-popup .menu-item {
+            background: none;
+            border: none;
+            text-align: left;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--handwritten-ink);
+            transition: background-color 0.1s;
+        }
+
+            .action-menu-popup .menu-item:hover {
+                background-color: #f0f0f0;
+            }
+
+
+    /* ================================== */
+    /* === 設定頁面專用佈局 (Side Menu) === */
+    /* ================================== */
+    .settings-page-layout {
+        /* 讓設定頁面佔滿整個視口 */
+        padding: 0;
+        max-width: 100%;
+        min-height: 100vh;
+        display: flex;
+        margin-top: 0;
+        background-color: var(--settings-main-bg); /* 圖片中的灰色背景 */
+    }
+
+    /* 設置頁面佈局的容器 (設定頁面的內容區塊) */
+    .settings-wrapper {
+        display: flex;
+        flex-grow: 1;
+        max-width: 1200px;
+        margin: 0 auto;
+        height: 100vh; /* 讓容器高度充滿視口 */
+    }
+
+    /* 側邊導航欄 */
+    .settings-sidebar {
+        width: 280px;
+        background-color: var(--card-bg-color); /* 左側背景為白色 */
+        padding: 30px 20px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+        position: relative; /* 用於定位 home-icon-top */
+    }
+
+    /* 左上角的回首頁按鈕 */
+    .home-icon-top {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        font-size: 2.2rem;
+        color: #999; /* 模仿圖片中的淺灰色 */
+        text-decoration: none;
+    }
+
+    /* 側邊欄頂部內容（頭像和名稱） */
+    .profile-display-area {
+        text-align: center;
+        width: 100%;
+        margin-top: 50px; /* 為左上角的房子圖標騰出空間 */
+    }
+
+    .profile-pic.large {
+        width: 150px;
+        height: 150px;
+        margin: 0 auto 15px;
+        border-radius: 50%;
+        background-color: var(--settings-line-color); /* 模擬圖片中的灰色圓圈 */
+        /* 簡化頭像圖標，使用純色，與圖片風格更接近 */
+        /background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M12 4a4 4 0 0 1 4 4a4 4 0 0 1-4 4a4 4 0 0 1-4-4a4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23a1a1a1' d='M12 4a4 4 0 0 1 4 4a4 4 0 0 1-4 4a4 4 0 0 1-4-4a4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4'/%3E%3C/svg%3E");
+        background-size: 80%;
+        background-repeat: no-repeat;
+        background-position: center;
+        border: none; /* 移除邊框 */
+    }
+
+    .user-name.large {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: #555;
+        margin-bottom: 30px;
+    }
+
+    /* 側邊欄底部功能（登出） */
+    .sidebar-footer {
+        width: 100%;
+        padding-top: 20px;
+        border-top: 1px solid var(--settings-line-color); /* 使用淺灰色線條 */
+        text-align: left;
+    }
+
+    .logout-link {
+        display: inline-block; /* 讓它不會佔滿整個寬度 */
+        text-decoration: none;
+        font-size: 1.2rem;
+        color: #777;
+        padding: 10px 0;
+    }
+
+        .logout-link i {
+            font-size: 1.3rem;
+            margin-right: 10px;
+        }
+
+    /* 設定頁面右側內容區 */
+    .settings-content-area {
+        flex-grow: 1;
+        background-color: var(--card-bg-color); /* 右側內容卡片背景為白色 */
+        padding: 40px;
+        border-left: 1px solid var(--settings-line-color); /* 右側內容與側邊欄的分割線 */
+        /* 使用 box-shadow 模擬圖片中的陰影/邊緣感 */
+        box-shadow: -2px 0 5px rgba(0, 0, 0, 0.05);
+    }
+
+    /* 設定內容區塊樣式（保持不變） */
+    .handwritten-title {
+        font-size: 1.8rem;
+        font-weight: 900;
+        margin-bottom: 25px;
+    }
+    /* 標題放大 */
+    .setting-block {
+        padding: 15px 0;
+    }
+
+    .setting-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .setting-label {
+        width: 150px;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+
+    .handwritten-input {
+        border: none;
+        border-bottom: 2px solid var(--handwritten-ink);
+        background: none;
+        font-size: 1.5rem; /* 增大輸入字體 */
+        padding: 0 5px;
+        outline: none;
+        flex-grow: 1;
+    }
+
+        .handwritten-input.small {
+            font-size: 1.2rem;
+            width: 80px;
+            flex-grow: 0;
+            text-align: right;
+        }
+
+    .handwritten-divider {
+        border: none;
+        border-top: 1px solid var(--settings-line-color);
+        margin: 30px 0;
+    }
+
+    .logout-full-button.hidden-on-navbar {
+        display: none;
+    }
+
+    /* --- 響應式設計 (RWD) --- */
+    @media (max-width: 900px) {
+        .top-navbar {
+            padding: 15px 10px;
+        }
+
+        .nav-menu {
+            gap: 15px;
+        }
+
+        .header-right {
+            gap: 10px;
+        }
+
+        .nav-item:not(.active) {
+            display: none;
+        }
+        /* 窄螢幕下隱藏非活躍菜單項 */
+        .content-wrapper {
+            flex-direction: column;
+        }
+
+        .dashboard {
+            padding: 10px;
+        }
+
+        .settings-content-wrapper {
+            flex-direction: column;
+            margin: 20px auto;
+            padding: 0 10px;
+        }
+
+        .profile-display-area {
+            display: none;
+        }
+
+        .setting-label {
+            width: 100px;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .card {
+            padding: 15px;
+        }
+
+        .nav-item {
+            font-size: 1rem;
+        }
+
+        .nav-icon {
+            width: 30px;
+            height: 30px;
+        }
+
+        .dot-indicator {
+            display: none;
+        }
+
+        .action-menu-popup {
+            right: 15px;
+            bottom: 75px;
+        }
+
+        .add-button {
+            right: 15px;
+            bottom: 15px;
+        }
+    }
+</style>

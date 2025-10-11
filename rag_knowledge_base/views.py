@@ -506,3 +506,77 @@ def history_analysis():
         results=None,
         knowledge_base=KNOWLEDGE_BASE
     )
+
+@app.route('/api/knowledge_base', methods=['GET'])
+def api_knowledge_base_get():
+    """
+    API: 回傳完整的知識庫數據 (供前端分析使用)。
+    """
+    # 直接從服務層獲取數據
+    data = quiz_service.get_knowledge_base()
+    return jsonify(data)
+
+@app.route('/api/knowledge_graph', methods=['GET'])
+def api_knowledge_graph_get():
+    """
+    回傳知識圖譜資料 (nodes, links) 給前端 D3.js 使用。
+    """
+    try:
+        # 以 KNOWLEDGE_BASE 為資料來源
+        nodes = []
+        links = []
+        node_ids = set()
+
+        # 1. 題目節點
+        for idx, q in enumerate(KNOWLEDGE_BASE):
+            q_id = f"q{idx}"
+            nodes.append({
+                "id": q_id,
+                "name": q.get("題目", ""),
+                "type": "question",
+                "group": "question",
+                "size": 10 + (q.get("error_count", 0) * 2),
+                "error_count": q.get("error_count", 0)
+            })
+            node_ids.add(q_id)
+
+            # 2. 標籤節點與連結
+            for tag in q.get("標籤", []):
+                tag_id = f"tag_{tag}"
+                if tag_id not in node_ids:
+                    nodes.append({
+                        "id": tag_id,
+                        "name": tag,
+                        "type": "tag",
+                        "group": "tag",
+                        "size": 16
+                    })
+                    node_ids.add(tag_id)
+                links.append({
+                    "source": q_id,
+                    "target": tag_id,
+                    "value": 1
+                })
+
+            # 3. 書籍節點與連結
+            book = q.get("來源書籍", "未知")
+            book_id = f"book_{book}"
+            if book_id not in node_ids:
+                nodes.append({
+                    "id": book_id,
+                    "name": book,
+                    "type": "book",
+                    "group": "book",
+                    "size": 22
+                })
+                node_ids.add(book_id)
+            links.append({
+                "source": q_id,
+                "target": book_id,
+                "value": 1
+            })
+
+        return jsonify({"nodes": nodes, "links": links})
+    except Exception as e:
+        print(f"知識圖譜 API 發生錯誤: {e}")
+        return jsonify({"error": "知識圖譜資料生成失敗", "message": str(e)}), 500

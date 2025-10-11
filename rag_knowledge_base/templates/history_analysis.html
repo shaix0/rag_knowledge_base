@@ -10,10 +10,362 @@
             background: #f9f9f9;
             border-radius: 8px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            cursor: pointer; /* 讓項目看起來可以點擊 */
+            transition: background-color 0.2s;
         }
+
+            .history-stat-item:hover {
+                background-color: #e9ecef;
+            }
+
+        .answer-text {
+            color: #198754; /* Bootstrap success green */
+            font-weight: bold;
+        }
+
+        .modal-question-info p {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .tag-badge {
+            display: inline-block;
+            padding: .35em .65em;
+            margin-right: 5px;
+            font-size: .75em;
+            font-weight: 700;
+            line-height: 1;
+            color: #fff;
+            background-color: #0d6efd; /* Blue */
+            border-radius: .25rem;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+        }
+        /* LLM 回應區 */
+        #llm-explanation {
+            border-left: 4px solid #007bff;
+            padding-left: 15px;
+            margin-top: 15px;
+            background-color: #e9f7ff;
+            border-radius: 4px;
+        }
+        /* 知識圖譜專屬樣式 */
+        .graph-container {
+            width: 100%;
+            height: 85vh; /* 佔據大部分可視高度 */
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+
+        .node {
+            stroke: #fff;
+            stroke-width: 1.5px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 8px;
+            font: 12px sans-serif;
+            background: #333;
+            color: white;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            max-width: 300px;
+            word-wrap: break-word;
+            text-align: left;
+            line-height: 1.4;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+            font-size: 14px; /* 調整字體大小 */
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        /* 節點顏色定義 */
+        .group-question {
+            fill: #4E79A7;
+        }
+        /* 題目: 藍色 */
+        .group-tag {
+            fill: #F28E2B;
+        }
+        /* 標籤: 橘色 */
+        .group-book {
+            fill: #59A14F;
+        }
+        /* 來源書籍: 綠色 */
     </style>
 
-    <h1 class="text-center mb-4 text-primary">題庫全域錯誤分析</h1>
+    <div class="container-fluid my-4">
+        <h1 class="text-center mb-3 text-primary">📚 知識圖譜視覺化</h1>
+        <p class="text-center text-muted">本圖譜顯示題目、標籤及來源書籍之間的關聯。節點大小代表重要性 (題目節點大小與**錯誤次數**相關)。</p>
+
+        <!-- 圖例區 -->
+        <div class="d-flex justify-content-center mb-3 flex-wrap">
+            <div class="legend-item"><div class="legend-dot group-book"></div> 來源書籍 (大)</div>
+            <div class="legend-item"><div class="legend-dot group-tag"></div> 標籤 (中)</div>
+            <div class="legend-item"><div class="legend-dot group-question"></div> 題目 (小，隨錯誤次數變大)</div>
+        </div>
+
+        <!-- 知識圖譜容器 -->
+        <div id="loading-spinner" class="text-center my-5">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">載入中...</span></div>
+            <p class="mt-2 text-muted">正在生成知識圖譜...</p>
+        </div>
+
+        <div class="graph-container">
+            <!-- SVG 將在此處生成 -->
+        </div>
+    </div>
+
+    <!-- 引入 D3.js 庫 -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // 知識圖譜腳本
+        async function loadKnowledgeGraph() {
+            const spinner = document.getElementById('loading-spinner');
+            const container = document.querySelector('.graph-container');
+            container.innerHTML = '';
+            spinner.style.display = 'block';
+
+            // 重新獲取容器的寬高 (重要，確保響應式)
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            if (width === 0 || height === 0) {
+                console.warn("Graph container is not visible or has zero dimensions. Retrying in 500ms.");
+                setTimeout(loadKnowledgeGraph, 500);
+                return;
+            }
+
+            try {
+                // ✅ 確保這裡呼叫的 API 路由是 /api/knowledge_graph
+                const response = await fetch('/api/knowledge_graph');
+
+                let graph;
+                if (!response.ok) {
+                    // 嘗試解析錯誤訊息，如果失敗則拋出標準錯誤
+                    const errorText = await response.text();
+                    throw new Error(`伺服器錯誤 ${response.status}: ${errorText.substring(0, 50)}...`);
+                }
+                graph = await response.json();
+
+
+                // 確保節點和連結存在
+                if (!graph.nodes || graph.nodes.length === 0) {
+                    container.innerHTML = '<p class="text-center p-5 text-muted">無知識圖譜數據可顯示。</p>';
+                    return;
+                }
+
+                // 執行繪圖
+                drawGraph(graph, width, height);
+
+            } catch (error) {
+                console.error("載入知識圖譜失敗:", error);
+                container.innerHTML = `<p class="text-center p-5 text-danger">錯誤：${error.message}</p>`;
+            } finally {
+                spinner.style.display = 'none';
+            }
+        }
+
+        function drawGraph(graph, width, height) {
+
+            // 清除舊的 SVG
+            d3.select(".graph-container svg").remove();
+
+            // 建立 SVG 容器
+            const svg = d3.select(".graph-container")
+                .append("svg")
+                .attr("viewBox", `0 0 ${width} ${height}`)
+                .attr("width", width)
+                .attr("height", height);
+
+            // 添加組元素用於平移和縮放
+            const g = svg.append("g");
+
+            // 啟動 Zoom 行為
+            svg.call(d3.zoom()
+                .scaleExtent([0.1, 4])
+                .on("zoom", function ({ transform }) {
+                    g.attr("transform", transform);
+                }))
+                .on("dblclick.zoom", null); // 禁用雙擊縮放
+
+            // 定義節點顏色 (與 CSS 定義的顏色保持一致)
+            const color = d3.scaleOrdinal()
+                .domain(["question", "tag", "book"])
+                .range(["#4E79A7", "#F28E2B", "#59A14F"]);
+
+            // 定義力導向模擬
+            const simulation = d3.forceSimulation(graph.nodes)
+                .force("link", d3.forceLink(graph.links).id(d => d.id).distance(100).strength(d => d.value * 0.1))
+                .force("charge", d3.forceManyBody().strength(-1000)) // 節點間排斥力
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("collision", d3.forceCollide().radius(d => d.size * 2)); // 避免重疊
+
+            // 繪製連結 (Links)
+            const link = g.append("g")
+                .attr("class", "links")
+                .attr("stroke", "#999")
+                .selectAll("line")
+                .data(graph.links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("stroke-width", d => Math.sqrt(d.value) * 1.5);
+
+            // 繪製節點 (Nodes)
+            const node = g.append("g")
+                .attr("class", "nodes")
+                .selectAll("circle")
+                .data(graph.nodes)
+                .enter().append("circle")
+                .attr("class", d => `node group-${d.group}`)
+                .attr("r", d => d.size)
+                .attr("fill", d => color(d.type))
+                .call(drag(simulation));
+
+            // 繪製標籤 (Labels)
+            const label = g.append("g")
+                .attr("class", "labels")
+                .selectAll("text")
+                .data(graph.nodes)
+                .enter().append("text")
+                .attr("x", d => d.size + 2) // 稍微偏移圓圈
+                .attr("y", 3)
+                .text(d => d.name)
+                .style("font-size", d => d.type === 'book' ? '14px' : '10px')
+                .style("fill", "#333")
+                .style("pointer-events", "none"); // 確保標籤不會阻擋點擊
+
+            // 繪製浮動提示 (Tooltip)
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip");
+
+            // 添加互動事件
+            node.on("mouseover", function (event, d) {
+                // 顯示 tooltip (顯示完整的 name，因為節點上可能被截斷了)
+                tooltip.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                // 由於我們在後端對 name 進行了截斷，這裡只能顯示截斷後的 name
+                let tooltipContent = `<strong>${d.name}</strong>`;
+                if (d.type === 'question' && d.error_count) {
+                    tooltipContent += `<br>錯誤次數: ${d.error_count}`;
+                }
+                tooltip.html(tooltipContent)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 28) + "px");
+
+                // 突出顯示相鄰節點
+                const connectedNodes = getConnectedNodes(d, graph.links);
+                node.style("opacity", n => connectedNodes.includes(n.id) || n.id === d.id ? 1 : 0.1);
+                link.style("stroke-opacity", l => l.source.id === d.id || l.target.id === d.id ? 1 : 0.1)
+                    .style("stroke", l => l.source.id === d.id || l.target.id === d.id ? "#333" : "#999");
+                label.style("opacity", n => connectedNodes.includes(n.id) || n.id === d.id ? 1 : 0.1);
+
+            }).on("mouseout", function (d) {
+                // 隱藏 tooltip 並恢復所有節點
+                tooltip.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+                node.style("opacity", 1);
+                link.style("stroke-opacity", 0.6).style("stroke", "#999");
+                label.style("opacity", 1);
+            });
+
+            // 模擬的 Tick 函數：更新節點和連結位置
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                // 限制節點邊界
+                node
+                    .attr("cx", d => d.x = Math.max(d.size, Math.min(width - d.size, d.x)))
+                    .attr("cy", d => d.y = Math.max(d.size, Math.min(height - d.size, d.y)));
+
+                label
+                    .attr("x", d => d.x + d.size + 2)
+                    .attr("y", d => d.y + 3);
+            });
+        }
+
+        // 拖曳處理函數
+        function drag(simulation) {
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                // 在拖曳結束時，讓節點位置逐漸恢復到模擬力場中，而不是固定不動
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+        }
+
+        // 獲取相連節點 ID 列表
+        function getConnectedNodes(d, links) {
+            const connected = new Set();
+            // D3 模擬會自動將 source 和 target 替換為節點物件
+            links.forEach(link => {
+                if (link.source.id === d.id) {
+                    connected.add(link.target.id);
+                } else if (link.target.id === d.id) {
+                    connected.add(link.source.id);
+                }
+            });
+            return Array.from(connected);
+        }
+
+        // 頁面載入時啟動圖譜
+        document.addEventListener('DOMContentLoaded', loadKnowledgeGraph);
+
+        // 監聽視窗大小改變，以確保圖譜容器響應式
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(loadKnowledgeGraph, 250); // 延遲重繪以優化性能
+        });
+    </script>
+
+    <h1 class="text-center mb-4 text-primary">🧠 弱點分析</h1>
 
     <!-- 返回測驗按鈕 -->
     <div class="view-control text-center mb-4">
@@ -28,103 +380,395 @@
 
     <!-- 分析內容 -->
     <div id="history-content" class="d-none">
+        <!-- 標籤化弱點分析 (新增) -->
         <div class="card shadow-sm mb-4">
-            <div class="card-header bg-warning text-dark">
-                <h4 class="mb-0">🔥 易錯題 (全域錯誤次數前五名)</h4>
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">易錯類型</h4>
             </div>
-            <div class="card-body" id="frequent-mistakes">
-                <!-- 數據將由 JS 填充 -->
+            <div class="card-body" id="frequent-mistake-tags">
+                <!-- 易錯標籤統計將在此處動態生成 -->
             </div>
         </div>
 
+        <!-- 易錯題 Top 10 (保留) -->
         <div class="card shadow-sm mb-4">
-            <div class="card-header bg-info text-dark">
-                <h4 class="mb-0">📚 易錯類型 (來源書籍全域錯誤次數統計)</h4>
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">🔥 易錯題 Top 10</h4>
             </div>
-            <div class="card-body" id="frequent-types">
-                <!-- 數據將由 JS 填充 -->
+            <div class="card-body" id="easy-mistake-questions">
+                <!-- 易錯題清單將在此處動態生成 -->
+            </div>
+        </div>
+
+        <!-- 來源書籍分析 (變更為次要) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">📚 來源書籍錯誤分析</h4>
+            </div>
+            <div class="card-body" id="frequent-mistake-types">
+                <!-- 易錯類型統計將在此處動態生成 -->
             </div>
         </div>
     </div>
 </div>
 
-<script type="module">
-    // --- 從後端 (Flask/Jinja) 載入的 JSON 題庫數據 ---
-    // 假設 Flask 路由已將 'all_questions_with_tags.json' 的內容作為 'knowledge_base' 變數傳入。
+<!-- --- 題目詳情 Modal 結構 --- -->
+<div class="modal fade" id="questionDetailModal" tabindex="-1" aria-labelledby="questionDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="questionDetailModalLabel">題目詳情與筆記</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- LLM 輔助按鈕 (新增) -->
+                <div class="d-flex justify-content-end mb-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="llm-explain-btn">
+                        ✨ 呼叫 AI 助教解釋此題
+                    </button>
+                </div>
+
+                <p class="lead" id="modal-question-text">載入中...</p>
+                <div id="modal-options" class="mb-3">
+                    <!-- 選項將在此處動態填充 -->
+                </div>
+
+                <h6 class="mb-2 text-primary">標籤</h6>
+                <div id="modal-tags" class="mb-3"></div> <!-- 標籤顯示 (新增) -->
+
+                <div class="modal-question-info bg-light p-3 rounded mb-4">
+                    <p><strong>正確答案:</strong> <span class="answer-text" id="modal-answer">N/A</span></p>
+                    <p><strong>來源書籍:</strong> <span id="modal-book-source">N/A</span></p>
+                </div>
+
+                <!-- LLM 解釋結果區 (新增) -->
+                <div id="llm-explanation" class="p-3 mb-4 d-none">
+                    <p class="text-muted" id="llm-explanation-text">AI 助教正在思考...</p>
+                </div>
+
+                <h6 class="mb-2 text-primary">📝 我的筆記</h6>
+                <textarea class="form-control" id="modal-user-notes" rows="4" placeholder="在這裡寫下您的理解或重點筆記..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                <button type="button" class="btn btn-success" id="save-notes-btn" data-question-key="">儲存筆記</button>
+                <div id="notes-status" class="ms-3 text-muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- --- 載入必要的函式庫 --- -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+<script>
     const globalKnowledgeBase = {{ knowledge_base | tojson }};
+    const easyMistakeDiv = $('#easy-mistake-questions');
+    const frequentTypesDiv = $('#frequent-mistake-types');
+    const frequentTagsDiv = $('#frequent-mistake-tags'); // 新增
+    const loadingSpinner = $('#history-loading-spinner');
+    const historyContent = $('#history-content');
 
-    // --- Function to Fetch and Analyze History ---
-    async function loadHistory() {
-        const frequentMistakesDiv = document.getElementById('frequent-mistakes');
-        const frequentTypesDiv = document.getElementById('frequent-types');
-        const loadingSpinner = document.getElementById('history-loading-spinner');
-        const historyContent = document.getElementById('history-content');
+    const questionDetailModalElement = document.getElementById('questionDetailModal');
+    let questionDetailModal;
 
-        // 檢查數據是否有效
+    // *** [1] LLM API 相關參數：修改為 Mistral API 路由 ***
+    const mistralApiUrl = '/api/mistral_explain';
+
+    /**
+     * 顯示自定義狀態訊息
+     */
+    function showStatus(message, type) {
+        const statusDiv = $('#notes-status');
+        statusDiv.removeClass().addClass(`ms-3 text-${type}`).text(message);
+        setTimeout(() => statusDiv.text(''), 3000);
+    }
+
+    /**
+     * 渲染標籤化弱點分析 (新增)
+     */
+    function renderTagAnalysis() {
+        const tagCounts = {};
+
+        globalKnowledgeBase.forEach(question => {
+            const errors = question.error_count || 0;
+            if (errors > 0 && question.標籤 && Array.isArray(question.標籤)) {
+                question.標籤.forEach(tag => {
+                    const cleanedTag = tag.trim();
+                    if (cleanedTag) {
+                        tagCounts[cleanedTag] = (tagCounts[cleanedTag] || 0) + errors;
+                    }
+                });
+            }
+        });
+
+        const sortedTags = Object.entries(tagCounts)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5); // 只取前五名弱點標籤
+
+        if (sortedTags.length === 0) {
+            frequentTagsDiv.html('<p class="text-success">🎉 目前在所有 AI 知識點上的錯誤次數均為 0。</p>');
+        } else {
+            frequentTagsDiv.html(sortedTags.map(([tag, count], index) => `
+                <div class="history-stat-item">
+                    <p class="mb-1 fw-bold">第 ${index + 1} 名弱點：<span class="tag-badge bg-danger">${tag}</span></p>
+                    <p class="mb-0 text-danger">累積錯誤次數：${count}</p>
+                    <p class="mb-0 text-muted">提示：應優先複習此標籤相關的知識點。</p>
+                </div>
+            `).join(''));
+        }
+    }
+
+
+    /**
+     * 渲染易錯題清單和分類統計
+     */
+    function renderAnalysis() {
         if (!globalKnowledgeBase || globalKnowledgeBase.length === 0) {
-            loadingSpinner.classList.add('d-none');
-            historyContent.classList.remove('d-none');
-            frequentMistakesDiv.innerHTML = '<p class="text-danger">無法載入題庫數據或題庫為空。</p>';
-            frequentTypesDiv.innerHTML = '<p class="text-danger">無法載入題庫數據或題庫為空。</p>';
+            loadingSpinner.hide();
+            historyContent.html('<p class="text-center text-danger">⚠️ 錯誤：找不到知識庫數據進行分析。</p>').removeClass('d-none');
             return;
         }
 
-        // 初始化顯示
-        frequentMistakesDiv.innerHTML = '<p class="text-primary">正在從題庫數據中計算...</p>';
-        frequentTypesDiv.innerHTML = '<p class="text-primary">正在從題庫數據中計算...</p>';
+        // 確保每條數據都有一個 'index' 欄位，以便前端可以正確引用（如果後端沒有提供）
+        globalKnowledgeBase.forEach((q, index) => q.index = index);
 
-        // 1. 處理易錯題 (根據 error_count 排序)
-        const sortedMistakes = globalKnowledgeBase
-            .filter(q => q.error_count > 0) // 只分析有錯誤次數的題目
-            .sort((a, b) => b.error_count - a.error_count) // 根據 JSON 中的 error_count 降序排列
-            .slice(0, 5); // 只取前五名
+        // 1. 處理易錯題 (錯誤次數 >= 1 的題目)
+        const mistakeQuestions = globalKnowledgeBase
+            .filter(q => (q.error_count || 0) >= 1)
+            .sort((a, b) => (b.error_count || 0) - (a.error_count || 0))
+            .slice(0, 10);
 
-        if (sortedMistakes.length === 0) {
-            frequentMistakesDiv.innerHTML = '<p class="text-success">目前所有題目全域錯誤次數均為 0。</p>';
+        if (mistakeQuestions.length === 0) {
+            easyMistakeDiv.html('<p class="text-success">太棒了！目前全域錯誤次數均為 0。</p>');
         } else {
-            frequentMistakesDiv.innerHTML = sortedMistakes.map((m, index) => `
-                <div class="history-stat-item">
-                    <p class="mb-1 fw-bold">第 ${index + 1} 名：${m.題目}</p>
+            easyMistakeDiv.html(mistakeQuestions.map(m => {
+                const qText = m.題目 || m.question_text || '題目內容缺失';
+                return `
+                <div class="history-stat-item clickable-question" data-question-key="${qText}">
+                    <p class="mb-1 fw-bold">${qText}</p>
                     <p class="mb-0 text-danger">全域錯誤次數：${m.error_count}</p>
-                    <p class="mb-0 text-muted">來源：${m.來源書籍}</p>
+                    <p class="mb-0 text-muted">來源：${m.來源書籍 || m.book_source || 'N/A'}</p>
                 </div>
-            `).join('');
+            `;
+            }).join(''));
         }
 
-        // 2. 處理易錯類型 (來源書籍錯誤次數統計)
+        // 2. 處理來源書籍統計 (保持不變)
         const typeCounts = {};
 
         globalKnowledgeBase.forEach(question => {
-            const typeKey = question['來源書籍'] || '未分類';
-            // 將所有屬於該來源書籍的 error_count 累加
-            const errors = question.error_count || 0; // 確保 error_count 有值
+            const typeKey = question['來源書籍'] || question['book_source'] || '未分類';
+            const errors = question.error_count || 0;
             typeCounts[typeKey] = (typeCounts[typeKey] || 0) + errors;
         });
 
         const sortedTypes = Object.entries(typeCounts)
-            .filter(([, count]) => count > 0) // 只顯示有錯誤的類型
+            .filter(([, count]) => count > 0)
             .sort(([, a], [, b]) => b - a)
-            .slice(0, 5); // 只取前五名
+            .slice(0, 5);
 
         if (sortedTypes.length === 0) {
-            frequentTypesDiv.innerHTML = '<p class="text-success">目前所有分類錯誤總次數均為 0。</p>';
+            frequentTypesDiv.html('<p class="text-success">目前所有分類錯誤總次數均為 0。</p>');
         } else {
-            frequentTypesDiv.innerHTML = sortedTypes.map(([type, count], index) => `
+            frequentTypesDiv.html(sortedTypes.map(([type, count], index) => `
                 <div class="history-stat-item">
-                    <p class="mb-1 fw-bold">第 ${index + 1} 名來源書籍：${type}</p>
-                    <p class="mb-0 text-danger">累積錯誤總次數：${count}</p>
+                    <p class="mb-1 fw-bold">第 ${index + 1} 名：${type}</p>
+                    <p class="mb-0 text-danger">總錯誤次數：${count}</p>
                 </div>
-            `).join('');
+            `).join(''));
         }
 
-        // 隱藏載入指示器，顯示內容
-        loadingSpinner.classList.add('d-none');
-        historyContent.classList.remove('d-none');
+        // 3. 渲染標籤分析
+        renderTagAnalysis();
+
+
+        loadingSpinner.hide();
+        historyContent.removeClass('d-none');
     }
 
-    // 頁面載入時啟動分析
-    window.onload = loadHistory;
+    // --- 點擊事件處理 (維持不變) ---
+
+    $(document).on('click', '.clickable-question', function() {
+        const questionKey = $(this).data('question-key');
+
+        if (!questionKey || questionKey === '題目內容缺失') {
+            console.error("DANGER: 無法解析題目 Key (內容)。");
+            showStatus('錯誤：無法解析題目內容。', 'danger');
+            return;
+        }
+
+        const encodedKey = encodeURIComponent(questionKey);
+        const apiUrlDetail = `/api/question/${encodedKey}`;
+
+        // 1. 重設 Modal 內容為載入狀態
+        $('#modal-question-text').text('載入中...');
+        $('#modal-options').empty();
+        $('#modal-answer').text('N/A');
+        $('#modal-book-source').text('N/A');
+        $('#modal-tags').empty(); // 清空標籤
+        $('#modal-user-notes').val('');
+        $('#notes-status').text('');
+        $('#llm-explanation').addClass('d-none'); // 隱藏 LLM 區
+        $('#llm-explanation-text').text('AI 助教正在思考...'); // 重設 LLM 文本
+        $('#save-notes-btn').prop('disabled', true).text('儲存筆記').removeAttr('data-question-key');
+        $('#llm-explain-btn').prop('disabled', true).text('✨ 呼叫 AI 助教解釋此題');
+
+        // 2. 立即顯示 Modal
+        if (questionDetailModal) {
+            questionDetailModal.show();
+        } else {
+             console.error("Bootstrap Modal 物件未初始化！");
+             return;
+        }
+
+        // 3. 呼叫 API 獲取題目詳情
+        console.log(`[DEBUG] 正在發送 GET 請求到: ${apiUrlDetail}`);
+
+        $.ajax({
+            url: apiUrlDetail,
+            type: 'GET',
+            success: function(data) {
+                console.log(`[DEBUG] API 請求成功，收到數據:`, data);
+
+                // 填充 Modal 內容
+                $('#modal-question-text').text(data.question_text);
+                $('#modal-answer').text(data.answer);
+                $('#modal-book-source').text(data.book_source);
+                $('#modal-user-notes').val(data.user_notes);
+
+                // 渲染選項
+                const labels = ['A', 'B', 'C', 'D', 'E'];
+                let optionsHtml = '';
+                (data.options || []).forEach((opt, index) => {
+                    optionsHtml += `<p class="mb-1">(${labels[index]}) ${opt}</p>`;
+                });
+                $('#modal-options').html(optionsHtml);
+
+                // 渲染標籤
+                let tagsHtml = '';
+                (data.tags || []).forEach(tag => {
+                    tagsHtml += `<span class="tag-badge bg-secondary">${tag}</span>`;
+                });
+                $('#modal-tags').html(tagsHtml || '<p class="text-muted">無標籤資訊</p>');
+
+
+                // 啟用儲存按鈕和 LLM 按鈕
+                $('#save-notes-btn').prop('disabled', false).attr('data-question-key', data.question_key);
+                $('#llm-explain-btn').prop('disabled', false).attr('data-question-text', data.question_text);
+                $('#llm-explain-btn').attr('data-user-notes', data.user_notes || '');
+
+            },
+            error: function(jqXHR) {
+                const errorMsg = jqXHR.responseJSON ? (jqXHR.responseJSON.error || JSON.stringify(jqXHR.responseJSON)) : jqXHR.responseText;
+                console.error(`[ERROR] 獲取題目詳情失敗 (${jqXHR.status}):`, errorMsg);
+
+                $('#modal-question-text').html(`<strong>載入失敗！</strong> 錯誤碼: ${jqXHR.status}。請檢查後端日誌。`);
+                showStatus(`錯誤: 載入詳情失敗。${jqXHR.status}`, 'danger');
+                $('#llm-explain-btn').prop('disabled', true); // 載入失敗禁用 LLM
+            }
+        });
+    });
+
+    // --- 儲存筆記處理 (保持不變) ---
+    $('#save-notes-btn').on('click', function() {
+        const qKey = $(this).data('question-key');
+        const notes = $('#modal-user-notes').val();
+
+        if (!qKey) {
+             showStatus('錯誤：找不到題目 Key。', 'danger');
+             return;
+        }
+
+        $('#save-notes-btn').prop('disabled', true).text('儲存中...');
+
+        $.ajax({
+            url: '/api/save_notes',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ question_key: qKey, user_notes: notes }),
+            success: function(response) {
+                showStatus(response.message || '儲存成功！', 'success');
+                $('#save-notes-btn').prop('disabled', false).text('儲存筆記');
+            },
+            error: function(jqXHR) {
+                const errorMsg = jqXHR.responseJSON ? jqXHR.responseJSON.error : '未知錯誤';
+                showStatus(`儲存失敗: ${errorMsg}`, 'danger');
+                console.error("儲存筆記失敗:", errorMsg);
+                $('#save-notes-btn').prop('disabled', false).text('儲存筆記');
+            }
+        });
+    });
+
+    // *** [2] LLM 輔助按鈕點擊事件：改為呼叫 /api/mistral_explain ***
+    $('#llm-explain-btn').on('click', async function() {
+        const btn = $(this);
+        const questionText = btn.attr('data-question-text');
+        const userNotes = $('#modal-user-notes').val();
+        const explanationDiv = $('#llm-explanation');
+        const explanationText = $('#llm-explanation-text');
+
+        if (!questionText) {
+            explanationText.text('錯誤：無法獲取題目內容。');
+            explanationDiv.removeClass('d-none').addClass('bg-danger text-white');
+            return;
+        }
+
+        // 1. 設置 UI 為載入狀態
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> AI 正在分析...');
+        explanationText.text('AI 助教正在分析題目與數據，請稍候...');
+        explanationDiv.removeClass('d-none bg-danger text-white').addClass('bg-info text-dark');
+        explanationDiv.css('border-left-color', '#007bff'); // 重設邊框顏色
+
+        const payload = {
+            question_text: questionText,
+            user_notes: userNotes // 傳遞筆記給後端
+        };
+
+        try {
+            console.log(`[DEBUG] 呼叫 Mistral API: ${mistralApiUrl}`);
+
+            // 使用 jQuery.ajax 呼叫後端路由
+            const response = await $.ajax({
+                url: mistralApiUrl,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload)
+            });
+
+            // 成功的回應
+            const text = response.explanation;
+
+            if (text) {
+                // Mistral 的回應是 Markdown，這裡將其顯示為純文本（您可以加入 Markdown 轉 HTML 函式來改進）
+                explanationText.html(text.replace(/\n/g, '<br>'));
+                explanationDiv.removeClass('bg-info text-dark').addClass('bg-light text-dark').css('border-left-color', '#198754');
+            } else {
+                explanationText.text('AI 助教無法生成解釋，後端回傳內容為空。');
+                explanationDiv.removeClass('bg-info text-dark').addClass('bg-danger text-white').css('border-left-color', '#dc3545');
+            }
+
+        } catch (jqXHR) {
+            const errorMsg = jqXHR.responseJSON ? (jqXHR.responseJSON.error || JSON.stringify(jqXHR.responseJSON)) : '未知錯誤';
+            console.error('Mistral API 呼叫失敗:', errorMsg);
+            explanationText.text('AI 助教服務連線失敗：' + errorMsg);
+            explanationDiv.removeClass('bg-info text-dark').addClass('bg-danger text-white').css('border-left-color', '#dc3545');
+        } finally {
+            btn.prop('disabled', false).html('✨ 呼叫 AI 助教解釋此題');
+        }
+    });
+
+
+    // 頁面載入時執行分析
+    $(document).ready(function() {
+        // 確保 Modal 在 DOM 載入後初始化
+        if (questionDetailModalElement) {
+            questionDetailModal = new bootstrap.Modal(questionDetailModalElement);
+        } else {
+            console.error("Modal element #questionDetailModal not found!");
+        }
+        renderAnalysis();
+    });
+
 </script>
-
-
 {% endblock %}

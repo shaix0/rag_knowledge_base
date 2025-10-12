@@ -355,16 +355,13 @@ app.config['SECRET_KEY'] = 'super_secret_key_for_quiz_app'
 TEMP_QUIZ_RESULTS = {} # 用於臨時存儲測驗結果
 @app.route('/quiz')
 def quiz():
-    """
+    """ 
     渲染測驗頁面 (quiz.html)。
-    如果未選擇模式 (mode='selection')，則顯示模式選擇按鈕。
-    如果選擇模式，則載入對應的題目。
+    根據 mode 參數載入不同的題目集。
     """
-    # 預設模式為 'selection'，即顯示選擇畫面
     mode = request.args.get('mode', 'selection') 
 
     if mode == 'selection':
-        # 顯示模式選擇畫面
         return render_template('quiz.html', 
                                title='選擇測驗模式', 
                                quiz_data=None, 
@@ -373,29 +370,37 @@ def quiz():
     all_questions = KNOWLEDGE_BASE
     quiz_data = []
     title = '隨機模擬測驗'
+    error_message = None
 
     if mode == 'practice':
-        # 錯題重練模式邏輯
         title = '錯題重練模式'
-        # 篩選邏輯：選擇 error_count 大於 0 的題目
-        for question in all_questions:
-            if question.get('error_count', False) > 0:
-                quiz_data.append(question)
-            # 額外模擬：將第一個題目也納入，代表它是上次錯的題目
-            elif not quiz_data and len(all_questions) > 0 and question == all_questions[0]:
-                 quiz_data.append(question)
+        # 篩選邏輯：選擇 error_count > 0 的題目
+        quiz_data = [q for q in all_questions if q.get('error_count', 0) > 0]
         
         if not quiz_data:
-            # 如果沒有錯題，返回選擇頁面並提示
-            return render_template('quiz.html', 
-                                   title='無錯題可練', 
-                                   quiz_data=None, 
-                                   mode='selection',
-                                   error_message='目前沒有收藏或答錯的題目，請選擇隨機出題。')
+            error_message = '目前沒有答錯的題目，請選擇隨機出題。'
 
-    else: # mode == 'normal' (預設為隨機出題)
+    elif mode == 'weakness':
+        title = '弱點加強模式'
+        # 模擬弱點加強邏輯：選擇錯誤次數最多的題目
+        sorted_questions = sorted(all_questions, key=lambda x: x.get('error_count', 0), reverse=True)
+        # 取錯誤次數最多的前 5 題 (或所有有錯的題目)
+        quiz_data = [q for q in sorted_questions if q.get('error_count', 0) > 0][:5]
+        
+        if not quiz_data:
+             error_message = '目前沒有答錯的題目，請選擇隨機出題。'
+    
+    elif mode == 'normal': 
         # 隨機模擬測驗邏輯
         quiz_data = all_questions
+
+    
+    if error_message:
+        return render_template('quiz.html', 
+                               title='無法開始測驗', 
+                               quiz_data=None, 
+                               mode='selection',
+                               error_message=error_message)
 
     # 將題目順序打亂
     random.shuffle(quiz_data)
@@ -408,14 +413,14 @@ def quiz():
 @app.route('/submit_quiz', methods=['POST'])
 def submit_quiz():
     """
-    接收使用者答案，計算成績，進行章節分析，並將結果存入臨時變數。
+    接收使用者答案，計算成績，並返回詳細的評分結果，供前端即時顯示。
     """
     if not request.is_json:
         return jsonify({"error": "Content-Type must be application/json"}), 400
 
     data = request.get_json()
     user_answers = data.get('answers', {})
-    quiz_data = data.get('quiz_data', [])
+    quiz_data = data.get('quiz_data', []) # 從前端獲取題目數據以進行比對
     
     # 參數設定
     SCORE_PER_QUESTION = 2
@@ -423,16 +428,14 @@ def submit_quiz():
     total_score = 0
     total_questions = len(quiz_data)
     
-    # 用於報告分析的結果列表
     quiz_results_for_report = []
-
-    # 章節準確率統計 (使用來源書籍作為章節)
-    book_stats = {} # { "來源書籍": { "total": 0, "correct": 0 } }
+    book_stats = {} 
 
     for index, question in enumerate(quiz_data, 1):
         q_key = f'question-{index}'
         user_answer = user_answers.get(q_key, None)
-        correct_answer = question.get('答案')
+        # ⚠️ 注意：這裡的 '答案' 必須與 KNOWLEDGE_BASE 中的鍵名一致
+        correct_answer = question.get('答案') 
         book_source = question.get('來源書籍', '未知章節')
         
         is_correct = (user_answer == correct_answer)
@@ -440,21 +443,20 @@ def submit_quiz():
         if is_correct:
             correct_count += 1
             total_score += SCORE_PER_QUESTION
-
-        # 彙整給報告頁面的數據
+        
+        # 彙整給報告頁面和前端即時顯示的數據
         quiz_results_for_report.append({
-            "question_id": index,
+            "question_index": index,          
             "question_text": question.get('題目', 'N/A'),
             "book_source": book_source,
             "is_correct": is_correct,
             "user_answer": user_answer,
-            "correct_answer": correct_answer,
+            "correct_answer": correct_answer, # 必須傳回給前端
         })
         
-        # 統計章節數據
+        # 統計章節數據 (略)
         if book_source not in book_stats:
             book_stats[book_source] = {"total": 0, "correct": 0}
-        
         book_stats[book_source]["total"] += 1
         if is_correct:
             book_stats[book_source]["correct"] += 1
@@ -468,20 +470,21 @@ def submit_quiz():
         "score_per_question": SCORE_PER_QUESTION,
         "overall_accuracy": (correct_count / total_questions * 100) if total_questions > 0 else 0,
         "detailed_results": quiz_results_for_report,
-        "book_stats": book_stats # 包含原始統計數據
+        "book_stats": book_stats
     }
     
     # 將結果儲存到臨時變數，以便報告頁面存取
     TEMP_QUIZ_RESULTS['latest_report'] = report_data
 
-    # 返回成功響應（包含基本分數資訊），前端將觸發導航到報告頁面
+    # 返回完整的結果，供前端即時顯示
     return jsonify({
         "success": True,
         "total_score": total_score,
         "correct_count": correct_count,
         "total_questions": total_questions,
         "score_per_question": SCORE_PER_QUESTION,
-        "message": "測驗提交成功，請查看報告。"
+        "detailed_results": quiz_results_for_report, # 關鍵：將詳細結果傳回
+        "message": "測驗提交成功，結果已載入。"
     })
 
 @app.route('/report_page')

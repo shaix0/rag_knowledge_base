@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>測驗成績統計與報表</title>
-    <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Inter 字體 -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
-    <!-- 引入 Chart.js for 數據可視化 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <style>
         body {
@@ -19,6 +16,17 @@
         .container-card {
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         }
+
+        /* 新增：合格/不合格的樣式 */
+        .pass-badge {
+            background-color: #10b981; /* 綠色 */
+            color: white;
+        }
+
+        .fail-badge {
+            background-color: #ef4444; /* 紅色 */
+            color: white;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -26,29 +34,35 @@
     <div class="max-w-6xl mx-auto">
         <h1 class="text-3xl font-extrabold text-gray-800 mb-6 border-b-4 border-indigo-500 pb-2">📊 測驗成績分析報告</h1>
 
-        <!-- 總成績概覽 -->
         <div id="summary-section" class="container-card bg-white p-6 rounded-xl mb-8">
             <h2 class="text-2xl font-bold text-indigo-700 mb-4">總成績概覽</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 text-center">
+
                 <div class="bg-indigo-100 p-4 rounded-lg">
                     <p class="text-sm text-indigo-600 font-semibold">總題數</p>
                     <p id="total-questions" class="text-4xl font-extrabold text-indigo-900 mt-1">0</p>
                 </div>
+
                 <div class="bg-green-100 p-4 rounded-lg">
                     <p class="text-sm text-green-600 font-semibold">答對題數 / 總分</p>
-                    <p id="correct-count" class="text-4xl font-extrabold text-green-900 mt-1">0 / 0</p>
+                    <p id="correct-score" class="text-4xl font-extrabold text-green-900 mt-1">0 / 0</p>
                 </div>
+
                 <div class="bg-yellow-100 p-4 rounded-lg">
                     <p class="text-sm text-yellow-600 font-semibold">總正確率</p>
                     <p id="overall-accuracy" class="text-4xl font-extrabold text-yellow-900 mt-1">0%</p>
                 </div>
+
+                <div class="bg-gray-100 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600 font-semibold">測驗結果 (70分合格)</p>
+                    <p id="pass-status" class="text-3xl font-extrabold mt-2">
+                    </p>
+                </div>
             </div>
         </div>
 
-        <!-- 圖表區塊 -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
 
-            <!-- 圓餅圖：題目分佈 -->
             <div class="lg:col-span-1 container-card bg-white p-6 rounded-xl flex flex-col items-center">
                 <h2 class="text-xl font-bold text-gray-700 mb-4">章節（來源書籍）題目分佈</h2>
                 <div class="w-full h-80">
@@ -56,7 +70,6 @@
                 </div>
             </div>
 
-            <!-- 長條圖：章節正確率 -->
             <div class="lg:col-span-2 container-card bg-white p-6 rounded-xl">
                 <h2 class="text-xl font-bold text-gray-700 mb-4">弱點章節分析 (正確率長條圖)</h2>
                 <div class="w-full h-96">
@@ -65,7 +78,6 @@
             </div>
         </div>
 
-        <!-- 詳細章節成績表格 -->
         <div class="container-card bg-white p-6 rounded-xl">
             <h2 class="text-2xl font-bold text-gray-700 mb-4">📚 詳細章節成績</h2>
             <div class="overflow-x-auto">
@@ -90,7 +102,6 @@
                         </tr>
                     </thead>
                     <tbody id="accuracy-table-body" class="bg-white divide-y divide-gray-200">
-                        <!-- 數據將由 JS 填充 -->
                     </tbody>
                 </table>
             </div>
@@ -108,6 +119,8 @@
 
         // 每題分數為 2 分
         const SCORE_PER_QUESTION = 2;
+        // 合格分數線 (新增)
+        const PASS_SCORE = 70;
 
         // 顏色配置 (用於圖表)
         const ACCURACY_COLORS = [
@@ -123,7 +136,7 @@
 
         /**
          * 處理測驗結果，計算總成績和各章節的準確率。
-         * @param {Array} results - 測驗結果陣列。
+         * * @param {Array} results - 測驗結果陣列。
          * @returns {Object} 包含總結和章節明細的物件。
          */
         function analyzeResults(results) {
@@ -161,30 +174,56 @@
                 data.color = ACCURACY_COLORS[index % ACCURACY_COLORS.length];
             });
 
+            // 計算總分 (新增)
+            const totalScore = correctCount * SCORE_PER_QUESTION;
+
             return {
                 totalQuestions,
                 correctCount,
+                totalScore, // 新增：傳回總分
                 bookAccuracy,
             };
         }
 
         /**
          * 渲染成績概覽區塊。
-         * @param {Object} summary - 成績總結數據。
+         * * @param {Object} summary - 成績總結數據。
          */
         function renderSummary(summary) {
-            const { totalQuestions, correctCount } = summary;
-            const totalScore = correctCount * SCORE_PER_QUESTION;
+            const { totalQuestions, correctCount, totalScore } = summary;
             const overallAccuracy = totalQuestions > 0 ? (correctCount / totalQuestions * 100).toFixed(1) : 0;
 
+            // 總分判斷 (新增邏輯)
+            const isPass = totalScore >= PASS_SCORE;
+            const passStatusElement = document.getElementById('pass-status');
+
+            // 根據是否合格設定樣式和文字
+            if (isPass) {
+                passStatusElement.innerHTML = `
+                    <span class="inline-block px-4 py-2 pass-badge rounded-lg shadow-md">
+                        🎉 合格 (${totalScore} 分)
+                    </span>
+                `;
+            } else {
+                passStatusElement.innerHTML = `
+                    <span class="inline-block px-4 py-2 fail-badge rounded-lg shadow-md">
+                        😭 不合格 (${totalScore} 分)
+                    </span>
+                `;
+            }
+
+
             document.getElementById('total-questions').textContent = totalQuestions;
-            document.getElementById('correct-count').textContent = `${correctCount} / ${totalScore}`;
+            // document.getElementById('correct-count') 改為 correct-score
+            document.getElementById('correct-score').textContent = `${correctCount} / ${totalScore}`;
             document.getElementById('overall-accuracy').textContent = `${overallAccuracy}%`;
         }
 
+        // ... (renderTable, renderDistributionChart, renderAccuracyChart 保持不變) ...
+
         /**
          * 渲染詳細章節成績表格。
-         * @param {Object} bookAccuracy - 各章節的成績數據。
+         * * @param {Object} bookAccuracy - 各章節的成績數據。
          */
         function renderTable(bookAccuracy) {
             const tbody = document.getElementById('accuracy-table-body');
@@ -200,7 +239,7 @@
 
                 // 弱點指標：低於 60% 標紅
                 // 只有題目數大於 1 且正確率低於 60% 才標記為「需加強」
-                const isWeakSpot = data.accuracy < 60 && data.total > 1;
+                const isWeakSpot = data.accuracy < 60 && data.total >= 1;
 
                 const indicatorClass = isWeakSpot ? 'bg-red-500 text-white font-semibold rounded-full p-1 text-xs text-center' : 'bg-green-500 text-white rounded-full p-1 text-xs text-center';
                 const indicatorText = isWeakSpot ? '⚠️ 需加強' : '✅ 掌握';
@@ -229,7 +268,7 @@
 
         /**
          * 渲染題目分佈圓餅圖 (Pie Chart)。
-         * @param {Object} bookAccuracy - 各章節的成績數據。
+         * * @param {Object} bookAccuracy - 各章節的成績數據。
          */
         function renderDistributionChart(bookAccuracy) {
             if (distributionChartInstance) {
@@ -268,7 +307,7 @@
 
         /**
          * 渲染章節正確率長條圖 (Bar Chart)。
-         * @param {Object} bookAccuracy - 各章節的成績數據。
+         * * @param {Object} bookAccuracy - 各章節的成績數據。
          */
         function renderAccuracyChart(bookAccuracy) {
             if (accuracyChartInstance) {
@@ -321,7 +360,6 @@
                 }
             });
         }
-
 
         // --- 主執行函數 ---
         window.onload = function() {

@@ -30,15 +30,12 @@
         z-index: 1050;
         border-radius: 8px;
     }
-    /* 評分結果樣式 */
-    .question-card.correct {
-        border: 2px solid #198754; /* 綠色邊框 */
-        background-color: #e6ffed; /* 淺綠色背景 */
-    }
 
+    /* 評分結果樣式 - 移除邊框和背景顏色 */
+    .question-card.correct,
     .question-card.incorrect {
-        border: 2px solid #dc3545; /* 紅色邊框 */
-        background-color: #ffebe6; /* 淺紅色背景 */
+        border: 1px solid rgba(0, 0, 0, 0.125); /* 恢復預設邊框 */
+        background-color: #fff; /* 恢復白色背景 */
     }
 
     .result-footer {
@@ -49,36 +46,26 @@
         border-bottom-right-radius: 12px;
     }
 
-    /* --- 新增：選項標記樣式 (用於顯示正確答案和錯誤選擇) --- */
+    /* --- 選項標記樣式: 恢復選項對錯標記 --- */
     .form-check-label {
         transition: color 0.3s;
         font-weight: normal;
     }
 
+        /* 正確答案標記 (綠色粗體) */
         .form-check-label.correct-option {
             font-weight: bold;
             color: #198754 !important; /* 綠色，正確答案 */
         }
 
+        /* 使用者選錯的答案標記 (紅色粗體帶刪除線) */
         .form-check-label.user-incorrect-choice {
             font-weight: bold;
             color: #dc3545 !important; /* 紅色，使用者選錯的答案 */
             text-decoration: line-through; /* 加上刪除線 */
         }
-    /* --- 新增：選項標記樣式 END --- */
+    /* --- 選項標記樣式 END --- */
 
-
-    .result-correct-badge {
-        color: #198754;
-        font-weight: bold;
-        margin-left: 10px;
-    }
-
-    .result-incorrect-badge {
-        color: #dc3545;
-        font-weight: bold;
-        margin-left: 10px;
-    }
 
     /* 模式選擇樣式 */
     .mode-selection-card {
@@ -104,7 +91,7 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
         }
 
-    /* 新增：測驗介面佈局 */
+    /* 測驗介面佈局 */
     .quiz-container {
         display: flex;
         gap: 30px;
@@ -115,8 +102,8 @@
         max-width: 800px;
     }
 
-    /* 新增：題目導覽列樣式 */
-    #question-navigator-wrap {
+    /* 題目導覽列樣式 */
+    #sidebar-wrap {
         width: 250px;
         flex-shrink: 0;
         position: sticky;
@@ -124,6 +111,27 @@
         align-self: flex-start;
         max-height: calc(100vh - 40px);
         overflow-y: auto;
+    }
+
+    /* 計時器樣式 (新要求) */
+    #timer-display {
+        font-size: 1.5rem;
+        font-weight: bold;
+        background-color: #6c757d; /* 灰底 */
+        color: white; /* 白字 */
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        text-align: center;
+        transition: background-color 0.3s;
+    }
+
+        #timer-display.alert-time {
+            background-color: #dc3545; /* 紅底 */
+        }
+
+    #question-navigator-wrap {
+        padding: 3px; /* 為了保持在 #sidebar-wrap 內 */
     }
 
     #question-navigator .nav-item {
@@ -153,7 +161,7 @@
         }
 
         .nav-link-q.answered {
-            background-color: #38c172; /* 已作答 (可以調整顏色) */
+            background-color: #38c172; /* 已作答 */
             color: white;
             box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
         }
@@ -176,7 +184,6 @@
 <div class="container my-5">
 
     {% if mode == 'selection' %}
-
     <div class="mode-selection-card bg-white p-5 d-flex flex-column justify-content-center">
         <h1 class="text-center text-3xl font-weight-bold text-dark mb-4">🩺 測驗模式選擇</h1>
         <p class="text-center text-secondary mb-5">請選擇您要開始的練習模式。</p>
@@ -201,7 +208,7 @@
                     <span class="fs-1 me-4">💪</span>
                     <div>
                         弱點加強模式
-                        <div class="text-sm fw-normal mt-1 opacity-75 text-white">針對您 **錯誤次數最多** 的題目進行重點練習。</div>
+                        <div class="text-sm fw-normal mt-1 opacity-75 text-white">針對錯誤次數最多的題目進行重點練習。</div>
                     </div>
                 </div>
             </a>
@@ -211,7 +218,7 @@
                     <span class="fs-1 me-4">🔁</span>
                     <div>
                         錯題重練模式
-                        <div class="text-sm fw-normal mt-1 opacity-75 text-dark">僅包含您過去**答錯或標記收藏**的題目，鞏固學習。</div>
+                        <div class="text-sm fw-normal mt-1 opacity-75 text-dark">僅包含過去答錯或標記收藏的題目，鞏固學習。</div>
                     </div>
                 </div>
             </a>
@@ -221,21 +228,28 @@
     {% else %}
 
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="text-center mb-0">{{ title }}</h1>
-        <a href="{{ url_for('quiz', mode='selection') }}" class="btn btn-secondary btn-sm shadow-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
-                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8" />
-            </svg>
-            返回模式選擇
-        </a>
+        <div>
+            <h1 class="text-center mb-0">{{ title }}</h1>
+            <p class="text-center text-muted mb-0">選擇題 <strong>{{ quiz_data | length }}</strong> 題，請選擇一個最正確的答案。</p>
+        </div>
+
+        <div class="text-end">
+            <a href="{{ url_for('quiz', mode='selection') }}" class="btn btn-secondary btn-sm shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8" />
+                </svg>
+                返回模式選擇
+            </a>
+        </div>
     </div>
 
-    <p class="text-center text-muted">選擇題 <strong>{{ quiz_data | length }}</strong> 題，請選擇一個最正確的答案。</p>
-
     <div class="quiz-container">
-        <div id="question-navigator-wrap" class="card shadow-sm p-3">
-            <h5 class="card-title text-center mb-3">題目概覽</h5>
-            <div id="question-navigator" class="text-center">
+        <div id="sidebar-wrap">
+            <div id="timer-display" class="shadow">⏱ 100:00</div>
+            <div id="question-navigator-wrap" class="card shadow-sm p-3">
+                <h5 class="card-title text-center mb-3">題目概覽</h5>
+                <div id="question-navigator" class="text-center">
+                </div>
             </div>
         </div>
 
@@ -298,6 +312,11 @@
         const totalQuestions = quizData.length;
         const navigatorDiv = document.getElementById('question-navigator');
 
+        let timerInterval = null;
+        const TOTAL_TIME_MINUTES = 100;
+        const TOTAL_TIME_SECONDS = TOTAL_TIME_MINUTES * 60; // 100 分鐘
+        let timeRemaining = TOTAL_TIME_SECONDS; // 初始化剩餘時間
+
         // 顯示自訂警告訊息
         function showAlert(message) {
             customAlert.innerHTML = `<strong>注意！</strong> ${message}`;
@@ -306,6 +325,51 @@
                 customAlert.style.display = 'none';
             }, 5000); // 5秒後自動關閉
         }
+
+        // --- 計時器函式 ---
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function forceSubmit() {
+            clearInterval(timerInterval); // 停止計時
+            showAlert('時間到！測驗已強制交卷。');
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton && !submitButton.disabled) {
+                // 模擬點擊提交按鈕，執行表單提交邏輯
+                submitButton.click();
+            }
+        }
+
+        function startTimer() {
+            const timerDisplay = document.getElementById('timer-display');
+
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            // 確保初始顯示正確
+            timerDisplay.textContent = `⏱ ${formatTime(timeRemaining)}`;
+            timerDisplay.classList.remove('alert-time');
+
+            timerInterval = setInterval(() => {
+                if (timeRemaining <= 0) {
+                    forceSubmit();
+                } else {
+                    timeRemaining--;
+                    timerDisplay.textContent = `⏱ ${formatTime(timeRemaining)}`;
+
+                    // 最後 10 分鐘 (600 秒) 變為紅底
+                    if (timeRemaining <= 10 * 60) {
+                        timerDisplay.classList.add('alert-time');
+                    }
+                }
+            }, 1000); // 每 1000 毫秒 (1 秒) 執行一次
+        }
+        // --- 計時器函式 END ---
+
 
         // --- 導覽列相關函式 (保持不變) ---
         function generateNavigator() {
@@ -361,8 +425,13 @@
         // --- 導覽列相關函式 END ---
 
 
-        // 顯示評分結果的函式 (核心修正區，與您的要求一致)
+        // 顯示評分結果的函式 (核心修正區 - 保留選項標記，只保留標準答案在 footer)
         function displayResults(result) {
+            // 測驗結束，停止計時
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
             // 1. 更新結果總結區塊
             document.getElementById('final-score').textContent = result.total_score;
             document.getElementById('max-score').textContent = result.total_questions * result.score_per_question;
@@ -386,8 +455,8 @@
 
                     const resultFooter = questionCard.querySelector('.result-footer');
 
-                    // 標記題卡顏色
-                    questionCard.classList.add(isCorrect ? 'correct' : 'incorrect');
+                    // 移除題卡顏色標記 (根據要求)
+                    questionCard.classList.remove('correct', 'incorrect');
 
                     // 標記選項顏色並禁用選項
                     const radioInputs = questionCard.querySelectorAll('input[type="radio"]');
@@ -395,7 +464,7 @@
                         radio.disabled = true; // 禁用所有選項
                         const label = radio.nextElementSibling;
 
-                        // 移除舊的標記類別
+                        // 移除所有選項標記類別
                         label.classList.remove('correct-option', 'user-incorrect-choice');
 
                         // 1. 標記正確答案 (Always Green)
@@ -403,13 +472,13 @@
                             label.classList.add('correct-option');
                         }
 
-                        // 2. 標記使用者選擇 (Red if incorrect)
+                        // 2. 標記使用者選擇 (Red if incorrect, 且有選)
                         if (radio.checked && !isCorrect) {
                             label.classList.add('user-incorrect-choice');
                         }
                     });
 
-                    // 顯示結果詳情區 (在 footer 顯示總結資訊)
+                    // 顯示結果詳情區 (在 footer 只顯示標準答案)
                     const summaryHtml = `
                         <div class="d-flex flex-wrap justify-content-between align-items-center">
                             <div class="text-sm text-dark">
@@ -432,6 +501,11 @@
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            // 確保停止計時器，防止重複提交
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
             // 1. 收集使用者答案 (邏輯不變)
             const userAnswers = {};
             const answeredQuestions = new Set();
@@ -448,8 +522,10 @@
             });
 
             const answeredCount = answeredQuestions.size;
-            if (answeredCount < totalQuestions) {
+            // 檢查是否為使用者手動點擊 (e.isTrusted) 且有未作答
+            if (e.isTrusted && answeredCount < totalQuestions) {
                 showAlert(`您還有 ${totalQuestions - answeredCount} 題未作答。`);
+                startTimer(); // 重新啟動計時器
                 return;
             }
 
@@ -462,8 +538,11 @@
                 const response = await fetch('/submit_quiz', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // 將 quiz_data 一起傳回後端，以便後端查閱答案
-                    body: JSON.stringify({ answers: userAnswers, quiz_data: quizData })
+                    body: JSON.stringify({
+                        answers: userAnswers,
+                        quiz_data: quizData,
+                        time_spent: TOTAL_TIME_SECONDS - timeRemaining
+                    })
                 });
 
                 let responseBody;
@@ -480,20 +559,22 @@
                 }
 
                 // 3. 成功處理：顯示結果回饋
-                // 由於後端現在返回了 detailed_results，可以立即顯示
                 displayResults(responseBody);
 
                 // 設定查看報告按鈕點擊事件
-                // 這裡假設報告頁面的 URL 是 /report_page
                 document.getElementById('view-report-btn').href = '/report_page';
 
             } catch (error) {
                 // 4. 錯誤處理
                 console.error('評分失敗:', error);
                 showAlert('評分時發生錯誤，請稍後再試。錯誤細節：' + error.message);
-                // 恢復按鈕
-                submitButton.disabled = false;
-                submitButton.textContent = '送出測驗';
+
+                // 恢復按鈕並重啟計時器 (如果還沒結束)
+                if (timeRemaining > 0) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = '送出測驗';
+                    startTimer();
+                }
             }
         });
 
@@ -502,9 +583,10 @@
             if (totalQuestions > 0) {
                 generateNavigator();
                 setupAnswerListener();
+                startTimer(); // 開始計時
             }
         });
     }
 </script>
 
-    {% endblock %}
+{% endblock %}

@@ -39,6 +39,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="rag_knowledge_base\quiz_manager.py" />
+    <Compile Include="rag_knowledge_base\services\preprocess_pdf.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="rag_knowledge_base\tag_helper.py">
       <SubType>Code</SubType>
     </Compile>
@@ -50,6 +53,8 @@
     <Folder Include="rag_knowledge_base\" />
     <Folder Include="rag_knowledge_base\information\" />
     <Folder Include="rag_knowledge_base\information\醫學資訊管理師\" />
+    <Folder Include="rag_knowledge_base\services\" />
+    <Folder Include="rag_knowledge_base\routes\" />
     <Folder Include="rag_knowledge_base\static\" />
     <Folder Include="rag_knowledge_base\static\content\" />
     <Folder Include="rag_knowledge_base\static\fonts\" />

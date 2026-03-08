@@ -176,7 +176,7 @@ with open(output_filename, 'w', encoding='utf-8') as f:
 
 print(f"\n所有 {len(all_extracted_questions)} 個題目已成功整理並儲存至 {output_filename}")
 
-merge_questions(output_filename)
+#merge_questions(output_filename)
 
 #import rag_knowledge_base.tag_helper
 
@@ -192,8 +192,8 @@ def embeddings():
         return
 
     # 載入題目 JSON 檔案
-    #json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_tags.json')
-    json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions.json')
+    json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_tags.json')
+    #json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions.json')
 
     try:
         with open(json_path, 'r', encoding='utf-8-sig') as f:
@@ -237,7 +237,7 @@ def embeddings():
             item["embedding"] = embeddings_list[i]
             output_data.append(item)
     
-    output_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'questions_with_embeddings.json')
+    output_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_embeddings.json')
     try:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(output_data, f, ensure_ascii=False, indent=4)

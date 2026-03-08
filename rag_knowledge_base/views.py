@@ -12,7 +12,7 @@ import numpy as np
 from mistralai import Mistral
 import random
 
-#json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'questions_with_embeddings.json')
+#json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_embeddings.json')
 json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_tags.json')
 try:
     with open(json_path, 'r', encoding='utf-8-sig') as f:
@@ -49,47 +49,50 @@ def home():
         all_tags=tags
     )
 
-'''
+
 @app.route('/search')
 def search():
-    tags=get_tag()
+    tags = get_tag()
     search_type = request.args.get('searchtype')
-    book_source = request.args.get('booksource', '')
+    book_source = request.args.get('booksource', '').lower()
     query = request.args.get(search_type, '').lower()
-    match = False
 
-    if query:
-        search_results = []
-        result_word = "查詢結果"
-        for item in KNOWLEDGE_BASE:
-            # 題目或答案包含關鍵字就加入結果
-            if ( search_type == 'q' and (
-                ("題目" in item and query in item["題目"].lower()) or
-                ("答案" in item and query in item["答案"].lower()) )
-            ):
-                match = True
-                
-            elif search_type == 'tag' :
-                for tag in item["標籤"]:
-                    if (query in tag.lower()) :
-                        match = True
-            
-            book_match = (not book_source or item.get("來源書籍", "") == book_source)
+    search_results = []
 
-            if match and book_match:
-                search_results.append({
-                    "question_text": item.get("題目", ""),
-                    "options": item.get("選項", []),
-                    "book_source": item.get("來源書籍", ""),
-                    "page_number": item.get("頁次", ""),
-                    "source_filename": item.get("來源檔案", ""),
-                    "answer": item.get("答案", "")
-                })
+    for item in KNOWLEDGE_BASE:
+        # 1️⃣ 檢查關鍵字或標籤是否匹配
+        keyword_match = False
+        if search_type == 'q' and query:
+            if (("題目" in item and query in item["題目"].lower()) or
+                ("答案" in item and query in item["答案"].lower())):
+                keyword_match = True
+        elif search_type == 'tag' and query:
+            for tag in item.get("標籤", []):
+                if query in tag.lower():
+                    keyword_match = True
+                    break
+        else:
+            # 如果沒輸入關鍵字或標籤，視為自動匹配
+            keyword_match = True
 
-        if search_results == []:
-            result_word = "查無結果"
-    else:
-        search_results = []
+        # 2️⃣ 檢查來源是否匹配
+        book_match = True
+        if book_source:
+            book_match = (item.get("來源書籍", "").lower() == book_source)
+
+        # 3️⃣ 兩者同時符合才加入結果
+        if keyword_match and book_match:
+            search_results.append({
+                "question_text": item.get("題目", ""),
+                "options": item.get("選項", []),
+                "book_source": item.get("來源書籍", ""),
+                "page_number": item.get("頁次", ""),
+                "source_filename": item.get("來源檔案", ""),
+                "answer": item.get("答案", "")
+            })
+
+    # 設定結果文字
+    result_word = "查詢結果" if search_results else "查無結果"
 
     return render_template(
         'index.html',
@@ -100,57 +103,90 @@ def search():
         result_word=result_word,
         source_path=os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師'),
         all_tags=tags
-    )'''
+    )
+
+'''
 
 @app.route('/search')
 def search():
     tags = get_tag()
     search_type = request.args.get('searchtype')
+    book_source = request.args.get('booksource', '')
     query = request.args.get(search_type, '').lower()
 
-    if query:
-        result_word = "查詢結果"
-        search_results_raw = []
-        
-        # 判斷是否使用向量搜尋
-        if search_type == 'q':
-            # 呼叫向量搜尋函式
-            vector_results = vector_search(query, similarity_threshold=0.7)
-            
-            # 將向量搜尋結果轉換為符合模板的格式
-            for result in vector_results:
-                item = result['item']
-                search_results_raw.append({
+    if not query:
+        return render_template(
+            'index.html',
+            title='搜尋結果',
+            year=datetime.now().year,
+            results=[],
+            search_query=query,
+            result_word="",
+            source_path=os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師'),
+            all_tags=tags
+        )
+
+    result_word = "查詢結果"
+    search_results = []
+
+    # ========================
+    # Q 搜尋：向量搜尋
+    # ========================
+    if search_type == 'q':
+        vector_results = vector_search(query, similarity_threshold=0.7)
+
+        for result in vector_results:
+            item = result["item"]
+
+            if not book_source or item.get("來源書籍", "") == book_source:
+                search_results.append({
                     "question_text": item.get("題目", ""),
                     "options": item.get("選項", []),
                     "book_source": item.get("來源書籍", ""),
                     "page_number": item.get("頁次", ""),
                     "source_filename": item.get("來源檔案", ""),
                     "answer": item.get("答案", ""),
-                    "score": result['score'] # 可以顯示分數以便除錯
+                    "score": result["score"]
                 })
-        else:
-            # 保留舊有的關鍵字或標籤搜尋邏輯
-            # 這裡您可以根據需要自行調整
-            pass
 
-        if not search_results_raw:
-            result_word = "查無結果"
-            
-    else:
-        search_results_raw = []
-        result_word = ""
+    # ========================
+    # Tag 搜尋
+    # ========================
+    elif search_type == 'tag':
+        for item in KNOWLEDGE_BASE:
+            tags_list = item.get("標籤", [])
+            match = any(query in tag.lower() for tag in tags_list)
+
+            if match and (not book_source or item.get("來源書籍", "") == book_source):
+                search_results.append({
+                    "question_text": item.get("題目", ""),
+                    "options": item.get("選項", []),
+                    "book_source": item.get("來源書籍", ""),
+                    "page_number": item.get("頁次", ""),
+                    "source_filename": item.get("來源檔案", ""),
+                    "answer": item.get("答案", ""),
+                    "score": 0.0   # 給個最低分，仍可排序
+                })
+
+    # ========================
+    # 排序（向量搜尋分數優先）
+    # ========================
+    search_results.sort(key=lambda x: x.get("score", 0), reverse=True)
+
+    if not search_results:
+        result_word = "查無結果"
 
     return render_template(
         'index.html',
         title='搜尋結果',
         year=datetime.now().year,
-        results=search_results_raw,
+        results=search_results,
         search_query=query,
         result_word=result_word,
         source_path=os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師'),
         all_tags=tags
     )
+
 # 餘弦相似度=點積=歐幾里得距離
 def cosine(vec1, vec2):
     vec1 = np.array(vec1)
@@ -164,48 +200,40 @@ def cosine(vec1, vec2):
     return dot_product / (norm_a * norm_b)
 # 進行向量搜尋
 def vector_search(query_text, similarity_threshold=0.5):
-    # 檢查 API 金鑰是否已設定
     api_key = os.environ.get("MISTRAL_API_KEY")
-
     client = Mistral(api_key=api_key)
     model = "mistral-embed"
 
+    # 查詢 embedding
     try:
-        # 生成查詢向量
-        query_embedding_response = client.embeddings.create(
+        query_vector = client.embeddings.create(
             model=model,
             inputs=[query_text],
-        )
-        query_vector = query_embedding_response.data[0].embedding
+        ).data[0].embedding
     except Exception as e:
-        print(f"生成查詢向量時發生錯誤: {e}")
-        return []
-
-    # 載入所有題目的資料和嵌入向量
-    questions_data = KNOWLEDGE_BASE
-    if not questions_data:
+        print(f"查詢 embedding 錯誤: {e}")
         return []
 
     search_results = []
 
-    # 遍歷所有題目，計算相似度並進行過濾
-    for item in questions_data:
-        if "embedding" in item:
-            item_vector = item["embedding"]
-            similarity_score = cosine(query_vector, item_vector) 
-            
-            # 只保留相似度大於或等於門檻值的項目
-            if similarity_score >= similarity_threshold:
-                 search_results.append({
-                    "item": item,
-                    "score": similarity_score
-                })
+    for item in KNOWLEDGE_BASE:
+        item_vector = item.get("embedding")
+        if not item_vector:
+            continue
 
-    # 依據相似度分數進行排序（分數越高越好）
+        score = cosine(query_vector, item_vector)
+
+        if score >= similarity_threshold:
+            search_results.append({
+                "item": item,
+                "score": score
+            })
+
+    # ✔ 排序：分數高 → 低
     search_results.sort(key=lambda x: x["score"], reverse=True)
 
-    # 返回最相關的 top_n 個結果
     return search_results
+'''
 
 @app.route('/edit')
 def edit():
@@ -317,8 +345,8 @@ def toggle_favorite():
         # 4. 尋找並切換匹配題目的收藏狀態
         for question in all_questions:
             # 檢查題幹和答案是否匹配
-            if (question.get('question_text') == match_key['question_text'] and
-                    question.get('answer') == match_key['answer']):
+            if (question.get('題目') == match_key['question_text'] and
+                    question.get('答案') == match_key['answer']):
                 
                 # 取得或初始化收藏狀態，並進行切換
                 current_state = question.get('is_favorite', False)

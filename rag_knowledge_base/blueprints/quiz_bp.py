@@ -2,7 +2,7 @@ from random import random
 from turtle import title
 
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for
-from rag_knowledge_base.models import Question
+from rag_knowledge_base.models import db,Question
 from rag_knowledge_base.services.quiz_service import get_questions_by_mode
 from rag_knowledge_base.config.quiz_config import MODE_CONFIG
 
@@ -74,7 +74,7 @@ def submit_quiz():
     detailed_results = []
     book_stats = {}
 
-    # 題目比對
+    # 比對答案並更新錯題統計
     for index, q in enumerate(questions, 1):
         q_key = f'question-{index}'
         user_answer = user_answers.get(q_key)
@@ -85,6 +85,11 @@ def submit_quiz():
         if is_correct:
             correct_count += 1
             total_score += SCORE_PER_QUESTION
+        else:
+            # 答錯就累計錯題次數
+            q.error_count = (q.error_count or 0) + 1
+            # 將更新加入 session
+            db.session.add(q)
 
         detailed_results.append({
             "question_index": index,
@@ -101,6 +106,9 @@ def submit_quiz():
         book_stats[book_source]["total"] += 1
         if is_correct:
             book_stats[book_source]["correct"] += 1
+
+    # 提交所有更新到資料庫
+    db.session.commit()
 
     # 儲存報告到臨時變數
     TEMP_QUIZ_RESULTS['latest_report'] = {

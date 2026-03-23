@@ -4,13 +4,15 @@ Routes and views for the flask application.
 
 from datetime import datetime
 from flask import render_template, request, jsonify
-from rag_knowledge_base import app
+# from rag_knowledge_base import app # 已在 __init__.py 中建立 app，這裡直接使用
 import json
 import os
 import re
 import numpy as np
-from mistralai import Mistral
+# from mistralai import Mistral
 import random
+from . import db  # 如果 __init__.py 已初始化 db
+from .models import Question
 
 #json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_embeddings.json')
 json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_tags.json')
@@ -235,24 +237,26 @@ def vector_search(query_text, similarity_threshold=0.5):
     return search_results
 '''
 
-@app.route('/edit')
-def edit():
-    """Renders the about page."""
+@app.route('/questions')
+def get_questions():
+    """Renders the question management page with all questions from DB."""    
+    
+    # 從資料庫抓取所有題目
+    all_questions_db = Question.query.all()
+    # 將 SQLAlchemy 物件轉成字典，供模板使用
     all_questions = []
 
-    for item in KNOWLEDGE_BASE:
+    for q in all_questions_db:
         all_questions.append({
-                    "question_text": item.get("題目", ""),
-                    "options": item.get("選項", []),
-                    "book_source": item.get("來源書籍", ""),
-                    "page_number": item.get("頁次", ""),
-                    "source_filename": item.get("來源檔案", ""),
-                    "answer": item.get("答案", "")
-                })
+            "question_text": q.question_text,
+            "options": q.options,
+            "source": q.source,
+            "page_number": q.page_number,
+            "answer": q.answers[0] if isinstance(q.answers, list) and len(q.answers) > 0 else q.answers        })
 
     return render_template(
-        'edit.html',
-        title='題庫管理',
+        'questions.html',
+        title='題庫',
         year=datetime.now().year,
         results=all_questions
     )

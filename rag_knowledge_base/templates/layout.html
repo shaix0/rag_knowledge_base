@@ -20,16 +20,13 @@
             <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                 <ul class="navbar-nav flex-grow-1">
                     <li class="nav-item">
-                        <a href="{{ url_for('home') }}" class="nav-link text-white">首頁</a>
+                        <a href="{{ url_for('main_bp.home') }}" class="nav-link text-white">首頁</a>
                     </li>
                     <li class="nav-item">
-                        <a href="{{ url_for('edit') }}" class="nav-link text-white">題庫管理</a>
+                        <a href="{{ url_for('questions_bp.get_questions') }}" class="nav-link text-white">題庫管理</a>
                     </li>
                     <li class="nav-item">
-                        <a href="{{ url_for('quiz') }}" class="nav-link text-white">測驗</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ url_for('history_analysis') }}" class="nav-link text-white">錯題分析</a>
+                        <a href="{{ url_for('quiz_bp.quiz') }}" class="nav-link text-white">模擬考</a>
                     </li>
                 </ul>
             </div>

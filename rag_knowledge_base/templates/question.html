@@ -57,13 +57,13 @@
                                     </button>
                                     <strong>題目：</strong> {{ result.question_text }}
                                 </p>
-                                <div class="question-info">
+                                <!-- <div class="question-info">
                                     來源：
                                     {% for source in result.source_filename %}
                                     <a href={{ source_path }} / {{ source }} target="_blank">{{ source }}</a>
                                     {% endfor %}
                                     &nbsp;{{ result.book_source }}&nbsp;p.{{ result.page_number }}
-                                </div>
+                                </div> -->
                                 <ul class="list-unstyled" style="margin: 0px;">
                                     {% set labels = ['A', 'B', 'C', 'D'] %}
                                     {% for option in result.options %}
@@ -84,7 +84,7 @@
     </div>
 
     <!-- 編輯視窗 -->
-    <div>
+    <!-- <div>
         <div class="insert-bg hide"></div>
         <div id="insert-window" class="hide">
             <form method="GET" action="/update_question">
@@ -121,7 +121,7 @@
             </form>
         </div>
     </div>
-</div>
+</div> -->
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
 <script>

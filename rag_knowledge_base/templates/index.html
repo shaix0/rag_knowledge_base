@@ -1,4 +1,4 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
 
 {% block content %}
 
@@ -9,37 +9,13 @@
             <!-- 搜尋框 -->
             <div class="row mt-4 mb-3">
                 <div class="col-md-8">
-                    <form method="GET" action="/search">
+                    <form method="GET" action="/questions/search">
                         <div class="input-group">
-                            <input type="hidden" name="searchtype" value="q">
+                            <!-- <input type="hidden" name="searchtype" value="q"> -->
                             <input type="text" class="form-control" name="q" placeholder="請輸入關鍵字搜尋..." aria-label="搜尋" style="margin-inline-end: 5px; border-radius: var(--bs-border-radius);">
-                            <select class="form-select" name="booksource" aria-label="搜尋">
-                                <option selected disabled>請選擇來源書籍...</option>
-                                <option value="常用醫護術語">常用醫護術語</option>
-                                <option value="醫學資訊管理學">醫學資訊管理學</option>
-                                <option value="時事">時事</option>
-                            </select>
                             <div class="input-group-append">
                                 <button class="btn btn-primary" type="submit">搜尋</button>
                             </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            <div class="row mt-4 mb-3">
-                <div class="col-md-8">
-                    <form method="GET" action="/search">
-                        <div class="input-group">
-                            <input type="hidden" name="searchtype" value="tag">
-                            <select class="form-select" name="tag" aria-label="搜尋">
-                                <option selected disabled>請選擇標籤搜尋...</option>
-                                {% for tag in all_tags %}
-                                <option value={{ tag }}>{{ tag }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="input-group-append">
-                            <button type="submit" class="btn btn-primary">標籤搜尋</button>
                         </div>
                     </form>
                 </div>
@@ -51,24 +27,21 @@
                     <div class="col-md-12">
                         <div class="d-flex align-items-center mb-3">
                             <h5 style="margin-block: 0px; margin-right: 15px;">{{ result_word }}</h5>
-                            {% if results %}
-                            <button id="toggle-answer" class="btn btn-lightblue">顯示答案</button>
+                            {% if questions %}
+                            <!-- <button id="toggle-answer" class="btn btn-lightblue">顯示答案</button> -->
                         </div>
 
                         <div id="search-results">
-                            {% for result in results %}
+                            {% for q in questions %}
                             <div class="search-results">
-                                <p class="question-text"><strong>題目：</strong> {{ result.question_text }}{{result.score}}</p>
+                                <p class="question-text"><strong>題目：</strong> {{ q.question_text }}{{q.score}}</p>
                                 <div class="question-info" style="display: none;">
-                                    {% for source in result.source_filename %}
-                                    <a href={{ source_path }} / {{ source }} target="_blank">{{ source }}</a>
-                                    {% endfor %}
-                                    &nbsp;{{ result.book_source }}&nbsp;p.{{ result.page_number }}
+                                    &nbsp;{{ q.source }}&nbsp;p.{{ q.page_number }}
                                 </div>
                                 <ul class="search-result list-unstyled">
                                     {% set labels = ['A', 'B', 'C', 'D'] %}
-                                    {% for option in result.options %}
-                                    {% if option == result.answer %}
+                                    {% for option in q.options %}
+                                    {% if option == q.answer %}
                                     <li class="answer">({{ labels[loop.index0] }}) {{ option }}</li>
                                     {% else %}
                                     <li>({{ labels[loop.index0] }}) {{ option }}</li>
@@ -85,26 +58,5 @@
         </main>
     </div>
 </div>
-
-<script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-<script>
-    $(document).ready( function () {
-        $('#toggle-answer').on('click', function () {
-            $('.answer').toggleClass('answer_highlight');
-
-            if ($(this).text() === "顯示答案") {
-                $(this).text("隱藏答案");
-            } else {
-                $(this).text("顯示答案");
-            }
-        });
-    });
-
-    $(function () {
-        $(".question-text").click(function () {
-            $(this).next(".question-info").slideToggle("slow");
-        });
-    });
-</script>
 
 {% endblock %}

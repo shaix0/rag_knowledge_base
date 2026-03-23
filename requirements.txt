@@ -1,4 +1,7 @@
 Flask>=2.2.3
+flask_sqlalchemy
+psycopg2-binary
+fitz
 PyMuPDF==1.26.4
 langchain==0.4.dev0
 langchain_community==0.3.29

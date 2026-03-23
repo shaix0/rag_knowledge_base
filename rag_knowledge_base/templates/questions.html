@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+{% for q in questions %}
+<div class="question">
+    <h3>{{ q.question_text }}</h3>
+
+    <ul>
+    {% set labels = ['A', 'B', 'C', 'D'] %}
+    {% for option in q.options %}
+        <li>({{ labels[loop.index0] }}) {{ option }}</li>
+    {% endfor %}
+    </ul>
+
+    <p>答案：
+        {% for answer in q.answers %}
+        {{ answer }}
+        {% endfor %}</p>
+    <p>來源：{{ q.source }} - {{ q.page_number }}</p>
+</div>
+
+<hr>
+{% endfor %}
+
+{% endblock %}

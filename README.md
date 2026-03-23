@@ -10,7 +10,7 @@
   - ✕進階查詢：多條件篩選(題目來源、分類...)
   - ✕題目收藏：使用者可以收藏特定題目，利用錯題重練模式加強練習
   - ✕新增題庫：將來源pdf轉換為固定格式  
-    目前`rag_knowledge_base\services\preprocess_pdf.py` 和 `rag_knowledge_base\pdftojson.py`檔案在轉換上還有部分瑕疵
+    目前 `rag_knowledge_base\services\preprocess_pdf.py` 和 `rag_knowledge_base\pdftojson.py` 檔案在轉換上還有部分瑕疵
 - 模擬測驗
   - 標準模式：從所有題庫中隨機選取題目。
     報表尚未完成

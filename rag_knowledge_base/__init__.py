@@ -22,8 +22,10 @@ def create_app():
     from .blueprints.main_bp import main_bp
     from .blueprints.questions_bp import questions_bp
     from .blueprints.quiz_bp import quiz_bp
+    from .blueprints.report_bp import report_bp
     app.register_blueprint(main_bp)
     app.register_blueprint(questions_bp)
     app.register_blueprint(quiz_bp)
+    app.register_blueprint(report_bp)
 
     return app

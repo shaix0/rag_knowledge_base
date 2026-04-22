@@ -42,7 +42,13 @@ input,
 select,
 textarea {
     /*max-width: 280px;*/
+    margin-inline-end: 5px; 
+    border-radius: var(--bs-border-radius);
 }
+
+/* .input-group :is(input, select) {
+    margin-inline: 5px;
+} */
 
 .all_questions {
     border: var(--bs-border-width) solid var(--bs-gray);

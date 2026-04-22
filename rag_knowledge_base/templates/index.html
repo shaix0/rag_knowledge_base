@@ -12,7 +12,13 @@
                     <form method="GET" action="/questions/search">
                         <div class="input-group">
                             <!-- <input type="hidden" name="searchtype" value="q"> -->
-                            <input type="text" class="form-control" name="q" placeholder="請輸入關鍵字搜尋..." aria-label="搜尋" style="margin-inline-end: 5px; border-radius: var(--bs-border-radius);">
+                            <input type="text" class="form-control" name="q" placeholder="請輸入關鍵字搜尋..." aria-label="搜尋" >
+                            <!-- 題目來源 -->
+                            <div>
+                                <select id="source-select" class="form-select" name="source" >
+                                    <option selected value="">全部來源</option>
+                                </select>
+                            </div>
                             <div class="input-group-append">
                                 <button class="btn btn-primary" type="submit">搜尋</button>
                             </div>
@@ -59,4 +65,25 @@
     </div>
 </div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/questions/sources_list')  
+            .then(res => res.json())
+            .then(data => {
+                const select = document.getElementById('source-select');
+
+                data.forEach(src => {
+                    const opt = document.createElement('option');
+                    opt.value = src;
+                    opt.textContent = src;
+                    select.appendChild(opt);
+                });
+            })
+            .catch(err => {
+                console.error('來源載入失敗:', err);
+            });
+    });
+</script>
+
 {% endblock %}
+

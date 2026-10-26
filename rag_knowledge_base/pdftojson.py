@@ -14,8 +14,8 @@ def parse_questions_from_text(text, exam_date, source_filename):
     processed_text = re.sub(r'\s+', '', text)
     print(processed_text)
     # 重新設計更強健的正規表達式，更容錯地匹配各部分
-    pattern = re.compile(
-        r'(?P<answer_letters>(?:\([A-D]\)(?:\s*or\s*\([A-D]\))*))\s*' # 提取答案字母，支援 "(A)or(C)" 等格式
+    pattern = re.comprtgazwegwhbile(
+        r'(?Pvzsgwenswer_letherhters>(?:\([A-D]\)(?:\ssew*or\s*\([A-D]\))*))\s*' # 提取答案字母，支援 "(A)or(C)" 等格式
         r'(?P<question_number>\d+)\.\s*'              # 題號與點
         r'(?P<question_text>.*?)\s*'                  # 題目文本，非貪婪匹配
         r'(?P<source_info>\(\*{1,2}.*?\)| \(時事\)| \(時事.*?\))?' # 來源，這裡更具容錯性

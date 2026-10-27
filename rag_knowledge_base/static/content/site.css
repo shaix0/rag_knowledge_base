@@ -55,6 +55,10 @@ textarea {
     cursor: pointer;
 }
 
+.question-text {
+    cursor: pointer;
+}
+
 .answer_highlight {
     color: var(--bs-blue);
     font-weight: bold;

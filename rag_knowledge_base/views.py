@@ -12,7 +12,6 @@ import numpy as np
 from mistralai import Mistral
 import random
 
-#json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_embeddings.json')
 json_path = os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師', 'all_questions_with_tags.json')
 try:
     with open(json_path, 'r', encoding='utf-8-sig') as f:
@@ -52,44 +51,35 @@ def home():
 
 @app.route('/search')
 def search():
-    tags = get_tag()
     search_type = request.args.get('searchtype')
-    book_source = request.args.get('booksource', '').lower()
+    """處理搜尋請求的路由。"""
     query = request.args.get(search_type, '').lower()
 
-    search_results = []
+    if query:
+        search_results = []
+        result_word = "查詢結果"
+        for item in KNOWLEDGE_BASE:
+            # 題目或答案包含關鍵字就加入結果
+            if ( search_type == 'q' and (
+                ("題目" in item and query in item["題目"].lower()) or
+                ("答案" in item and query in item["答案"].lower()) )
+            ):
+                match = True
+                
+            elif search_type == 'tag' :
+                for tag in item["標籤"]:
+                    if (query in tag.lower()) :
+                        match = True
 
-    for item in KNOWLEDGE_BASE:
-        # 1️⃣ 檢查關鍵字或標籤是否匹配
-        keyword_match = False
-        if search_type == 'q' and query:
-            if (("題目" in item and query in item["題目"].lower()) or
-                ("答案" in item and query in item["答案"].lower())):
-                keyword_match = True
-        elif search_type == 'tag' and query:
-            for tag in item.get("標籤", []):
-                if query in tag.lower():
-                    keyword_match = True
-                    break
-        else:
-            # 如果沒輸入關鍵字或標籤，視為自動匹配
-            keyword_match = True
-
-        # 2️⃣ 檢查來源是否匹配
-        book_match = True
-        if book_source:
-            book_match = (item.get("來源書籍", "").lower() == book_source)
-
-        # 3️⃣ 兩者同時符合才加入結果
-        if keyword_match and book_match:
-            search_results.append({
-                "question_text": item.get("題目", ""),
-                "options": item.get("選項", []),
-                "book_source": item.get("來源書籍", ""),
-                "page_number": item.get("頁次", ""),
-                "source_filename": item.get("來源檔案", ""),
-                "answer": item.get("答案", "")
-            })
+            if match :
+                search_results.append({
+                    "question_text": item.get("題目", ""),
+                    "options": item.get("選項", []),
+                    "book_source": item.get("來源書籍", ""),
+                    "page_number": item.get("頁次", ""),
+                    "source_filename": item.get("來源檔案", ""),
+                    "answer": item.get("答案", "")
+                })
 
     # 設定結果文字
     result_word = "查詢結果" if search_results else "查無結果"
@@ -105,77 +95,42 @@ def search():
         all_tags=tags
     )
 
-'''
+def search_by_keyword(query):
+    results = []
+    for item in KNOWLEDGE_BASE:
+        if (
+            ("題目" in item and query in item["題目"].lower()) or
+            ("答案" in item and query in item["答案"].lower())
+        ):
+            results.append({
+                "question_text": item.get("題目", ""),
+                "options": item.get("選項", []),
+                "book_source": item.get("來源書籍", ""),
+                "page_number": item.get("頁次", ""),
+                "source_filename": item.get("來源檔案", ""),
+                "answer": item.get("答案", ""),
+                "keywords": item.get("關鍵字", [])
+            })
+    return results
 
-@app.route('/search')
-def search():
-    tags = get_tag()
-    search_type = request.args.get('searchtype')
-    book_source = request.args.get('booksource', '')
-    query = request.args.get(search_type, '').lower()
+def search_by_tag(search_tag):
+    results = []
+    for item in KNOWLEDGE_BASE:
+        if search_tag in [tag.lower() for tag in item.get('關鍵字', [])]:
+            results.append({
+                "question_text": item.get("題目", ""),
+                "options": item.get("選項", []),
+                "book_source": item.get("來源書籍", ""),
+                "page_number": item.get("頁次", ""),
+                "source_filename": item.get("來源檔案", ""),
+                "answer": item.get("答案", ""),
+                "keywords": item.get("關鍵字", [])
+            })
+    return results
 
-    if not query:
-        return render_template(
-            'index.html',
-            title='搜尋結果',
-            year=datetime.now().year,
-            results=[],
-            search_query=query,
-            result_word="",
-            source_path=os.path.join(os.path.dirname(__file__), 'information', '醫學資訊管理師'),
-            all_tags=tags
-        )
-
-    result_word = "查詢結果"
-    search_results = []
-
-    # ========================
-    # Q 搜尋：向量搜尋
-    # ========================
-    if search_type == 'q':
-        vector_results = vector_search(query, similarity_threshold=0.7)
-
-        for result in vector_results:
-            item = result["item"]
-
-            if not book_source or item.get("來源書籍", "") == book_source:
-                search_results.append({
-                    "question_text": item.get("題目", ""),
-                    "options": item.get("選項", []),
-                    "book_source": item.get("來源書籍", ""),
-                    "page_number": item.get("頁次", ""),
-                    "source_filename": item.get("來源檔案", ""),
-                    "answer": item.get("答案", ""),
-                    "score": result["score"]
-                })
-
-    # ========================
-    # Tag 搜尋
-    # ========================
-    elif search_type == 'tag':
-        for item in KNOWLEDGE_BASE:
-            tags_list = item.get("標籤", [])
-            match = any(query in tag.lower() for tag in tags_list)
-
-            if match and (not book_source or item.get("來源書籍", "") == book_source):
-                search_results.append({
-                    "question_text": item.get("題目", ""),
-                    "options": item.get("選項", []),
-                    "book_source": item.get("來源書籍", ""),
-                    "page_number": item.get("頁次", ""),
-                    "source_filename": item.get("來源檔案", ""),
-                    "answer": item.get("答案", ""),
-                    "score": 0.0   # 給個最低分，仍可排序
-                })
-
-    # ========================
-    # 排序（向量搜尋分數優先）
-    # ========================
-    search_results.sort(key=lambda x: x.get("score", 0), reverse=True)
-
-    if not search_results:
-        result_word = "查無結果"
-
+@app.route('/about')
+def about():
+    """Renders the about page."""
     return render_template(
         'index.html',
         title='搜尋結果',

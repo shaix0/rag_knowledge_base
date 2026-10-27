@@ -23,25 +23,6 @@ def parse_questions_from_text(text, exam_date, source_filename):
         r'(?=\s*\(\w\)\s*\d|\s*\Z)',
         #re.S | re.M
     )
-    
-    matches = re.finditer(pattern, processed_text)
-
-    # 分割選項
-    option_pattern = re.compile(r'\([A-D]\)(.*?)(?=\([A-D]\)|$)')
-
-    for match in matches:
-        try:
-            answer_letters_str = match.group('answer_letters').strip()
-            answer_letters = re.findall(r'\(([A-D])\)', answer_letters_str)  # 直接取得所有字母
-            question_number = match.group('question_number').strip()
-            question_text = match.group('question_text').strip()
-            source_info_str = match.group('source_info').strip().strip('()') if match.group('source_info') else ""
-            options_text = match.group('options_text').strip() if match.group('options_text') else ""
-
-            # 提取選項列表
-            options_list = [opt.strip() for opt in re.findall(option_pattern, options_text)]
-
-            # 確保選項列表有四個，否則視為解析失敗
             if len(options_list) != 4:
                 print(f"警告：在 {exam_date} 的第 {question_number} 題選項不完整，可能為解析錯誤。已跳過該題。")
                 continue

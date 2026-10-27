@@ -28,6 +28,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="rag_knowledge_base\atest.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="rag_knowledge_base\clustering.py">
       <SubType>Code</SubType>
     </Compile>
